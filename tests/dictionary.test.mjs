@@ -93,6 +93,17 @@ test('七課與六題型使用完整詞條、例句及關聯', async () => {
     (await dictionary.request('/api/entries?ids=moe:5570,moe:2415,bad:1,moe:9999999')).length === 2,
   );
 });
+test('相關詞目保留第八調組合符號，未被轉碼或刪除', async () => {
+  const word = await dictionary.getEntry(67);
+  const relation = word.relations.find((x) => x.id === 17734);
+  assert.equal(relation.hanji, '十八仔');
+  assert.equal(relation.tailo, 'si\u030dp-pat-á');
+  assert.equal((await dictionary.getEntry(17734)).tailo, relation.tailo);
+  assert.equal(
+    (await dictionary.request('/api/search?q=sip8-pat4-a2&mode=exact')).entries[0].id,
+    17734,
+  );
+});
 test('標音保留罕用字與表情符號，白讀優先，拒絕無效本文', async () => {
   const text = '今仔日天氣真好。𪜶🛸';
   const result = await dictionary.annotate(text);
