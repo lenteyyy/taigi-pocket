@@ -352,8 +352,9 @@ async function playSound(button, key, example = 0, sound = '') {
     $('#player').innerHTML =
       `${icon('sound')}<span>正在載入：${esc(label)}</span><button data-action="stop-audio" aria-label="停止播放">${icon('close')}</button>`;
     $('#player').hidden = false;
-    audio.src = await audioURL(e, example, sound);
+    const source = await audioURL(e, example, sound);
     if (ticket !== playbackTicket) return;
+    audio.src = source;
     await audio.play();
     if (ticket !== playbackTicket) return;
     $('#player span').textContent = '正在播放：' + label;
