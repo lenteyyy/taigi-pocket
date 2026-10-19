@@ -1,0 +1,19 @@
+{
+  "name": "taigi-pocket",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "台語小辭典與每日學習。Made By 冷踢踢。",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build.mjs",
+    "dev": "python3 -m http.server 8767 --bind 127.0.0.1 --directory site"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "sql.js": "1.15.1"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "taigi-dict.sqlite": {
+    "sourceSHA256": "5d8a745061a9a886cb40d13df7d3075911aeda48fec76843e745266eceb0153e",
+    "publishedSHA256": "11bec1405dbb9d53033333ce0df9b453e54a6856314442f6ca5822be53c2d99d",
+    "metadata": {
+      "source": "教育部《臺灣台語常用詞辭典》",
+      "license": "創用 CC 姓名標示－禁止改作 3.0 臺灣（CC BY-ND 3.0 TW）",
+      "source_url": "https://sutian.moe.edu.tw/",
+      "schema_version": "4",
+      "ods_snapshot_date": "2026-08-02",
+      "build_date": "2026-08-10"
+    },
+    "entryCount": 29591
+  },
+  "taigi-soannteng.sqlite": {
+    "sourceSHA256": "16220b60bfcd1979be404a7584842fd6cb4f0aaee20a02b1c69439e82a7fd4d2",
+    "publishedSHA256": "cdb5fb08e2790ec497a8c6d4ee4e96f319bac907a271017eef19210ff65f90e0",
+    "metadata": {
+      "source": "台文華文線頂辭典",
+      "source_repo_url": "https://github.com/ChhoeTaigi/ChhoeTaigiDatabase",
+      "base_data_by": "Tēⁿ Liông-úi（鄭良偉）教授",
+      "edited_by": "Iûⁿ Ún-giân（楊允言）教授、眾phah字kap校對ê義工",
+      "license": "創用 CC 姓名標示－相同方式分享 4.0 國際（CC BY-SA 4.0）",
+      "license_short": "CC BY-SA 4.0",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "obtained_via": "ChhoeTaigiDatabase https://github.com/ChhoeTaigi/ChhoeTaigiDatabase",
+      "upstream_commit": "858b8b43a91195621b704a93b7f84ee4881fda5b",
+      "modifications": "CSV から SQLite への形式変換、列の抜粋（番號・白話字・台羅・漢羅台文・對應華文）、検索キー tailo_norm・tailo_flat の機械生成。語の内容は無改変。",
+      "schema_version": "2",
+      "entry_count": "91332",
+      "build_date": "2026-08-02"
+    },
+    "entryCount": 91332
+  }
+}

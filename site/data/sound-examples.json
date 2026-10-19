@@ -1,0 +1,272 @@
+{
+  "p": {
+    "entry": 49,
+    "hanji": "八",
+    "tailo": "peh/pueh"
+  },
+  "ph": {
+    "entry": 1215,
+    "hanji": "片",
+    "tailo": "phìnn"
+  },
+  "b": {
+    "entry": 804,
+    "hanji": "木",
+    "tailo": "ba̍k"
+  },
+  "m": {
+    "entry": 811,
+    "hanji": "毛",
+    "tailo": "mn̂g"
+  },
+  "t": {
+    "entry": 161,
+    "hanji": "丈",
+    "tailo": "tn̄g"
+  },
+  "th": {
+    "entry": 784,
+    "hanji": "天",
+    "tailo": "thinn"
+  },
+  "n": {
+    "entry": 2288,
+    "hanji": "年",
+    "tailo": "nî"
+  },
+  "l": {
+    "entry": 52,
+    "hanji": "力",
+    "tailo": "la̍t"
+  },
+  "k": {
+    "entry": 41,
+    "hanji": "九",
+    "tailo": "káu"
+  },
+  "kh": {
+    "entry": 183,
+    "hanji": "口",
+    "tailo": "kháu"
+  },
+  "g": {
+    "entry": 565,
+    "hanji": "五",
+    "tailo": "gōo"
+  },
+  "ng": {
+    "entry": 4487,
+    "hanji": "迎",
+    "tailo": "ngiâ"
+  },
+  "ts": {
+    "entry": 54,
+    "hanji": "十",
+    "tailo": "tsa̍p"
+  },
+  "tsh": {
+    "entry": 165,
+    "hanji": "上",
+    "tailo": "tshiūnn"
+  },
+  "j": {
+    "entry": 7895,
+    "hanji": "逐",
+    "tailo": "jiok/lip"
+  },
+  "s": {
+    "entry": 163,
+    "hanji": "三",
+    "tailo": "sann"
+  },
+  "h": {
+    "entry": 169,
+    "hanji": "下",
+    "tailo": "hē"
+  },
+  "a": {
+    "entry": 4496,
+    "hanji": "阿",
+    "tailo": "a"
+  },
+  "oo": {
+    "entry": 3383,
+    "hanji": "芋",
+    "tailo": "ōo"
+  },
+  "o": {
+    "entry": 7814,
+    "hanji": "蚵",
+    "tailo": "ô"
+  },
+  "e": {
+    "entry": 167,
+    "hanji": "下",
+    "tailo": "ē"
+  },
+  "i": {
+    "entry": 1310,
+    "hanji": "以",
+    "tailo": "í"
+  },
+  "u": {
+    "entry": 2439,
+    "hanji": "有",
+    "tailo": "ū"
+  },
+  "ai": {
+    "entry": 4778,
+    "hanji": "哀",
+    "tailo": "ai"
+  },
+  "au": {
+    "entry": 4898,
+    "hanji": "後",
+    "tailo": "āu"
+  },
+  "ia": {
+    "entry": 176,
+    "hanji": "也",
+    "tailo": "iā"
+  },
+  "io": {
+    "entry": 9476,
+    "hanji": "搖",
+    "tailo": "iô"
+  },
+  "iu": {
+    "entry": 58,
+    "hanji": "又",
+    "tailo": "iū"
+  },
+  "ua": {
+    "entry": 5709,
+    "hanji": "倚",
+    "tailo": "uá"
+  },
+  "ue": {
+    "entry": 5959,
+    "hanji": "挨",
+    "tailo": "e/ue"
+  },
+  "ui": {
+    "entry": 2830,
+    "hanji": "衣",
+    "tailo": "ui"
+  },
+  "iau": {
+    "entry": 3048,
+    "hanji": "妖",
+    "tailo": "iau"
+  },
+  "uai": {
+    "entry": 5119,
+    "hanji": "歪",
+    "tailo": "uai"
+  },
+  "am": {
+    "entry": 4262,
+    "hanji": "泔",
+    "tailo": "ám"
+  },
+  "an": {
+    "entry": 5505,
+    "hanji": "限",
+    "tailo": "ān"
+  },
+  "ang": {
+    "entry": 5365,
+    "hanji": "紅",
+    "tailo": "âng"
+  },
+  "ap": {
+    "entry": 7637,
+    "hanji": "盒",
+    "tailo": "a̍p"
+  },
+  "at": {
+    "entry": 10150,
+    "hanji": "遏",
+    "tailo": "at"
+  },
+  "ak": {
+    "entry": 8408,
+    "hanji": "握",
+    "tailo": "ak"
+  },
+  "ah": {
+    "entry": 3943,
+    "hanji": "押",
+    "tailo": "ah"
+  },
+  "ann": {
+    "entry": 2120,
+    "hanji": "向",
+    "tailo": "ànn"
+  },
+  "inn": {
+    "entry": 9352,
+    "hanji": "圓",
+    "tailo": "înn"
+  },
+  "enn": {
+    "entry": 567,
+    "hanji": "井",
+    "tailo": "tsénn/tsínn"
+  },
+  "onn": {
+    "entry": 5804,
+    "hanji": "唔",
+    "tailo": "onn"
+  },
+  "iann": {
+    "entry": 11017,
+    "hanji": "影",
+    "tailo": "iánn"
+  },
+  "iunn": {
+    "entry": 2588,
+    "hanji": "羊",
+    "tailo": "iûnn"
+  },
+  "uann": {
+    "entry": 3213,
+    "hanji": "旱",
+    "tailo": "uānn"
+  },
+  "uainn": {
+    "entry": 13479,
+    "hanji": "𨂿",
+    "tailo": "uáinn"
+  },
+  "iaunn": {
+    "entry": 8171,
+    "hanji": "喓",
+    "tailo": "iaunn"
+  },
+  "ho": {
+    "entry": 2272,
+    "hanji": "好",
+    "tailo": "hó"
+  },
+  "lai": {
+    "entry": 574,
+    "hanji": "內",
+    "tailo": "lāi"
+  },
+  "khi": {
+    "entry": 1395,
+    "hanji": "去",
+    "tailo": "khì"
+  },
+  "sik": {
+    "entry": 11187,
+    "hanji": "熟",
+    "tailo": "si̍k"
+  },
+  "jit": {
+    "entry": 801,
+    "hanji": "日",
+    "tailo": "ji̍t/li̍t"
+  }
+}
