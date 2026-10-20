@@ -8,6 +8,7 @@ import {
   nextReview,
   buildQueue,
   buildDailyPlan,
+  buildStudyQueue,
   recordStudyActivity,
   studyDay,
   parseCSV,
@@ -123,7 +124,7 @@ test('選擇題只留一個正解，排除同字與重複釋義', () => {
   assert.equal(options.filter((x) => x.senses[0].definition === '吃。').length, 1);
   assert.equal(options.filter((x) => x.hanji === '食').length, 1);
 });
-test('每日複習與新詞各自限額，跨詞表共用；零額度不安排詞目', () => {
+test('每日目標跨詞表共用，依今日進度安排首輪學習', () => {
   const now = Date.parse('2026-10-19T06:00:00Z');
   const entries = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, source: 'moe' }));
   const state = initialState();
@@ -153,7 +154,7 @@ test('每日複習與新詞各自限額，跨詞表共用；零額度不安排�
   state.prefs.newLimit = 80;
   assert.equal(buildDailyPlan(entries, state, now).newCount, 79);
 });
-test('同日答錯重練不重複計入額度；臺灣午夜重置每日額度', () => {
+test('同日答錯重練不重複計數；臺灣午夜重置每日目標進度', () => {
   const now = Date.parse('2026-10-19T15:30:00Z');
   const state = initialState();
   state.prefs.newLimit = 1;
@@ -171,6 +172,53 @@ test('同日答錯重練不重複計入額度；臺灣午夜重置每日額度',
   assert.equal(plan.newDone, 0);
   assert.equal(plan.reviewDone, 0);
   assert.deepEqual(plan.queue, ['moe:1', 'moe:2']);
+});
+test('學完十個新詞可接著學第十一個，連續加學不改每日目標', () => {
+  const now = Date.parse('2026-10-20T06:00:00Z');
+  const state = initialState();
+  const entries = Array.from({ length: 35 }, (_, i) => ({ id: i + 1 }));
+  for (let batch = 0; batch < 3; batch++) {
+    const queue = buildStudyQueue(entries, state, now);
+    assert.deepEqual(
+      queue,
+      entries.slice(batch * 10, batch * 10 + 10).map((e) => `moe:${e.id}`),
+    );
+    for (const key of queue) {
+      recordStudyActivity(state, key, true, now);
+      state.progress[key] = nextReview(null, true, now);
+    }
+    assert.equal(buildDailyPlan(entries, state, now).newDone, (batch + 1) * 10);
+    assert.equal(state.prefs.newLimit, 10);
+  }
+  assert.deepEqual(buildStudyQueue(entries, state, now), [
+    'moe:31',
+    'moe:32',
+    'moe:33',
+    'moe:34',
+    'moe:35',
+  ]);
+});
+test('複習達標、零目標、收藏全學過及跨日仍可主動練習，空詞表回傳空佇列', () => {
+  const now = Date.parse('2026-10-20T06:00:00Z');
+  const state = initialState();
+  state.prefs.reviewLimit = 1;
+  state.prefs.newLimit = 0;
+  const entries = [{ id: 1 }, { id: 2 }];
+  for (const entry of entries)
+    state.progress[`moe:${entry.id}`] = nextReview(null, true, now - 2 * 86400000);
+  assert.deepEqual(buildStudyQueue(entries, state, now), ['moe:1']);
+  recordStudyActivity(state, 'moe:1', false, now);
+  state.progress['moe:1'] = nextReview(state.progress['moe:1'], true, now);
+  assert.deepEqual(buildStudyQueue(entries, state, now), ['moe:2']);
+  recordStudyActivity(state, 'moe:2', false, now);
+  state.progress['moe:2'] = nextReview(state.progress['moe:2'], true, now);
+  assert.deepEqual(buildStudyQueue(entries, state, now), ['moe:1']);
+  assert.equal(buildDailyPlan(entries, state, now).reviewDone, 2);
+  state.prefs.reviewLimit = 0;
+  assert.deepEqual(buildStudyQueue(entries, state, now), ['moe:1', 'moe:2']);
+  assert.deepEqual(buildStudyQueue([{ id: 3 }, { id: 3 }], state, now), ['moe:3']);
+  assert.deepEqual(buildStudyQueue(entries, state, now + 86400000), ['moe:1', 'moe:2']);
+  assert.deepEqual(buildStudyQueue([], state, now), []);
 });
 test('正式音量預設八成，舊測試音量遷移且保留詞庫與每日設定', () => {
   const state = initialState();

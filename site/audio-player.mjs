@@ -79,6 +79,19 @@ export function studyAudioTracks(target, mode, options = []) {
   return target?.audio ? [{ key: keyOf(target), label: '' }] : [];
 }
 
+export function studyExample(target) {
+  const examples = target?.senses?.flatMap((sense) => sense.examples || []) || [];
+  return examples.find((example) => example.audio_basename) || examples[0];
+}
+
+export function answerAudioTracks(target) {
+  if (!target) return [];
+  const tracks = studyAudioTracks(target, 'meaning');
+  const example = studyExample(target);
+  if (example?.audio_basename) tracks.push({ key: keyOf(target), example: example.id, label: '' });
+  return tracks;
+}
+
 export function createStudyAutoplay(play, stop) {
   let generation = 0,
     last = null;

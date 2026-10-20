@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createAudioPlayer, createStudyAutoplay, studyAudioTracks } from '../site/audio-player.mjs';
+import {
+  createAudioPlayer,
+  createStudyAutoplay,
+  studyAudioTracks,
+  answerAudioTracks,
+  studyExample,
+} from '../site/audio-player.mjs';
 import { exampleSources } from '../site/audio-sources.mjs';
 
 const deferred = () => {
@@ -167,4 +173,64 @@ test('辨音選項播完一個再播下一個，手動停止即停止序列', as
   );
   await autoplay.run('one', [{ key: 'a' }, { key: 'b' }, { key: 'c' }]);
   assert.deepEqual(calls, ['a', 'b']);
+});
+
+test('作答後只讀正確詞目，再讀第一筆有錄音的例句；缺音不偽造來源', () => {
+  const target = {
+    id: 12183,
+    audio: true,
+    senses: [
+      {
+        examples: [
+          { id: 1, hanji: '無錄音' },
+          { id: 13307, audio_basename: '12183-1-1' },
+          { id: 2, audio_basename: '12183-1-2' },
+        ],
+      },
+    ],
+  };
+  assert.equal(studyExample(target).id, 13307);
+  assert.deepEqual(answerAudioTracks(target), [
+    { key: 'moe:12183', label: '' },
+    { key: 'moe:12183', example: 13307, label: '' },
+  ]);
+  assert.deepEqual(answerAudioTracks({ id: 1, audio: true }), [{ key: 'moe:1', label: '' }]);
+  assert.deepEqual(answerAudioTracks({ id: 1, audio: false }), []);
+  assert.deepEqual(answerAudioTracks(null), []);
+  assert.deepEqual(answerAudioTracks({ ...target, audio: false }), [
+    { key: 'moe:12183', example: 13307, label: '' },
+  ]);
+});
+
+test('作答錄音等詞目 ended 才播例句，換下一詞不殘留上一詞例句', async () => {
+  const audio = new FakeAudio();
+  const player = createAudioPlayer(audio);
+  const starts = [deferred(), deferred(), deferred(), deferred()];
+  let index = 0;
+  const autoplay = createStudyAutoplay(
+    (track) =>
+      player.play([`${track.key}/${track.example || 'word'}`], () => starts[index++].resolve()),
+    player.stop,
+  );
+  const target = {
+    id: 1,
+    audio: true,
+    senses: [{ examples: [{ id: 42, audio_basename: 'one' }] }],
+  };
+  const first = autoplay.run('answer1', answerAudioTracks(target));
+  await starts[0].promise;
+  assert.deepEqual(audio.sources, ['moe:1/word']);
+  audio.end();
+  await starts[1].promise;
+  assert.deepEqual(audio.sources, ['moe:1/word', 'moe:1/42']);
+  audio.end();
+  await first;
+  const second = autoplay.run('answer2', answerAudioTracks(target));
+  await starts[2].promise;
+  const next = autoplay.run('next', [{ key: 'moe:2' }]);
+  await starts[3].promise;
+  await second;
+  assert.deepEqual(audio.sources, ['moe:1/word', 'moe:1/42', 'moe:1/word', 'moe:2/word']);
+  autoplay.cancel();
+  await next;
 });

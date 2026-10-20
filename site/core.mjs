@@ -155,6 +155,23 @@ export function buildDailyPlan(entries, state, now = Date.now()) {
     retryCount: retry.length,
   };
 }
+// 每日設定是目標；達標後仍能主動加學，詞表全學過也可自由複習。
+export function buildStudyQueue(entries, state, now = Date.now()) {
+  const plan = buildDailyPlan(entries, state, now);
+  if (plan.queue.length) return plan.queue;
+  const unique = [...new Map(entries.map((e) => [keyOf(e), e])).values()];
+  const due = unique
+    .filter((e) => state.progress[keyOf(e)]?.due <= now)
+    .sort((a, b) => state.progress[keyOf(a)].due - state.progress[keyOf(b)].due)
+    .slice(0, plan.reviewLimit || 20);
+  const fresh = unique.filter((e) => !state.progress[keyOf(e)]).slice(0, plan.newLimit || 10);
+  if (due.length || fresh.length) return [...due, ...fresh].map(keyOf);
+  return unique
+    .filter((e) => state.progress[keyOf(e)])
+    .sort((a, b) => state.progress[keyOf(a)].due - state.progress[keyOf(b)].due)
+    .slice(0, plan.reviewLimit || 20)
+    .map(keyOf);
+}
 export function initialState() {
   return {
     version: 1,

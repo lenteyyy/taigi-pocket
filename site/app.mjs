@@ -1,4 +1,10 @@
-import { createAudioPlayer, createStudyAutoplay, studyAudioTracks } from './audio-player.mjs';
+import {
+  createAudioPlayer,
+  createStudyAutoplay,
+  studyAudioTracks,
+  answerAudioTracks,
+  studyExample,
+} from './audio-player.mjs';
 import { request, audioURLs, exampleHasAudio } from './api.mjs';
 import { mountWidgets } from './widgets.mjs';
 import {
@@ -8,6 +14,7 @@ import {
   STORAGE_KEY,
   nextReview,
   buildDailyPlan,
+  buildStudyQueue,
   dailyLimit,
   recordStudyActivity,
   normalizeRoman,
@@ -86,15 +93,15 @@ let currentAudioButton = null,
   toastTimer;
 const audioPlayer = createAudioPlayer(audio);
 const studyAutoplay = createStudyAutoplay(
-  ({ key, label, sound }) =>
+  ({ key, label, sound, example = 0 }) =>
     playSound(
       document.querySelector(
         sound
           ? `#main [data-action="local-audio"][data-sound="${sound}"]`
-          : `#main [data-action="audio"][data-key="${key}"]:not([data-example])`,
+          : `#main [data-action="audio"][data-key="${key}"]${example ? `[data-example="${example}"]` : ':not([data-example])'}`,
       ),
       key || null,
-      0,
+      example,
       sound || '',
       label,
     ),
@@ -450,16 +457,16 @@ function studyStats(pool = cards) {
   };
 }
 function studySummaryHTML() {
-  const plan = buildDailyPlan(
-    cards.filter((e) => e.senses?.[0]?.definition),
-    state,
-  );
-  return `<section class="study-banner"><div><h2>今日學習</h2><p>待複習 ${plan.reviewCount} 個　新詞 ${plan.newCount} 個</p></div><button class="primary" data-action="${state.session ? 'resume-study' : 'start-study'}" data-deck="all" ${!state.session && !plan.queue.length ? 'disabled' : ''}>${icon(state.session ? 'refresh' : 'learn')}${state.session ? '繼續學習' : '開始學習'}</button></section>
+  const pool = cards.filter((e) => e.senses?.[0]?.definition);
+  const plan = buildDailyPlan(pool, state);
+  const queue = buildStudyQueue(pool, state);
+  const continuing = state.session || (!plan.queue.length && plan.newDone + plan.reviewDone > 0);
+  return `<section class="study-banner"><div><h2>今日學習</h2><p>${plan.queue.length ? `待複習 ${plan.reviewCount} 個　新詞 ${plan.newCount} 個` : `本次可練習 ${queue.length} 個詞`}</p></div><button class="primary" data-action="${state.session ? 'resume-study' : 'start-study'}" data-deck="all" ${!state.session && !queue.length ? 'disabled' : ''}>${icon(continuing ? 'refresh' : 'learn')}${continuing ? '繼續學習' : '開始學習'}</button></section>
     <form id="daily-plan-form" class="card daily-plan-form">
-      <h2>每日學習設定</h2>
+      <h2>每日學習目標</h2>
       <div class="daily-plan-fields">
-        <label for="daily-review-limit">每日複習<input id="daily-review-limit" name="reviewCount" type="number" min="0" max="1000" step="1" required value="${state.prefs.reviewLimit}"><span class="small">個詞</span></label>
-        <label for="daily-new-limit">每日新詞<input id="daily-new-limit" name="newCount" type="number" min="0" max="1000" step="1" required value="${state.prefs.newLimit}"><span class="small">個詞</span></label>
+        <label for="daily-review-limit">每日複習目標<input id="daily-review-limit" name="reviewCount" type="number" min="0" max="1000" step="1" required value="${state.prefs.reviewLimit}"><span class="small">個詞</span></label>
+        <label for="daily-new-limit">每日新詞目標<input id="daily-new-limit" name="newCount" type="number" min="0" max="1000" step="1" required value="${state.prefs.newLimit}"><span class="small">個詞</span></label>
         <button class="primary" type="submit">儲存設定</button>
       </div>
     </form>
@@ -522,11 +529,7 @@ async function startStudy(deck = 'all', mode = 'meaning') {
     toast('這份詞表還沒有可學習的詞，先加入幾個詞吧。');
     return;
   }
-  const queue = buildDailyPlan(pool, state).queue;
-  if (!queue.length) {
-    toast('目前沒有符合每日設定的詞目。');
-    return;
-  }
+  const queue = buildStudyQueue(pool, state);
   if (state.session && !confirm('要結束目前的練習，改學這份詞表嗎？')) return;
   studyAutoplay.cancel();
   state.session = { queue, cursor: 0, score: 0, deck, mode, started: Date.now() };
@@ -553,13 +556,14 @@ async function resumeStudy() {
 function sessionTarget() {
   return entryCache.get(state.session?.queue[state.session.cursor]);
 }
-function constrainSession() {
+function pruneUnavailableCards() {
   const session = state.session;
   const start = session.cursor + (session.answered ? 1 : 0);
   const pending = session.queue.slice(start);
-  const entries = pending.map((key) => entryCache.get(key)).filter(Boolean);
-  const allowed = new Set(buildDailyPlan(entries, state).queue);
-  session.queue = [...session.queue.slice(0, start), ...pending.filter((key) => allowed.has(key))];
+  session.queue = [
+    ...session.queue.slice(0, start),
+    ...pending.filter((key) => entryCache.get(key)?.senses?.[0]?.definition),
+  ];
 }
 function renderSession() {
   const session = state.session;
@@ -567,7 +571,7 @@ function renderSession() {
     renderStudy();
     return;
   }
-  constrainSession();
+  pruneUnavailableCards();
   if (session.cursor >= session.queue.length) {
     finishSession();
     return;
@@ -602,7 +606,7 @@ function renderSession() {
     dictation: '聽錄音，寫出臺羅。',
     flash: '想一想，你還記得嗎？',
   }[session.mode];
-  const ex = target.senses.flatMap((x) => x.examples || [])[0];
+  const ex = studyExample(target);
   $('#main').innerHTML =
     header('每日學習', '先複習，再學新詞。') +
     `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="pause-study">${icon('back')}暫停並返回</button><select id="study-mode" aria-label="練習方式" ${answered ? 'disabled' : ''}>${MODES.map(([k, v]) => `<option value="${k}" ${session.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="session-progress"><span>第 ${session.cursor + 1}／${session.queue.length} 張</span><span>答對 ${session.score} 張</span></div><div class="progress-track"><span style="width:${(session.cursor / session.queue.length) * 100}%"></span></div><section class="card question-card"><p class="question-kind">${prompt}</p>${audioMode ? audioButton(target, 0, true) : session.mode === 'meaning-sound' ? `<div class="definition" style="margin:28px 0">${esc(target.senses[0].definition)}</div>` : `<h2 class="question-word">${esc(wordLabel(target))}</h2>${session.mode === 'flash' ? `<div class="word-roman">${esc(target.tailo)}</div>` : ''}${audioButton(target)}`}${session.mode === 'meaning' && ex ? `<div class="question-context"><div class="row between"><span>${esc(ex.hanji)}</span>${ex.audio_basename ? audioButton(target, ex.id) : ''}</div><p class="roman">${esc(ex.tailo)}</p></div>` : ''}${session.mode === 'dictation' ? `<form id="dictation-form"><input class="dictation" id="dictation-answer" aria-label="輸入臺羅答案" placeholder="例如：ho2 或 hó" autocomplete="off" autocapitalize="off" spellcheck="false" ${answered ? 'disabled' : ''} value="${esc(answered?.input || '')}"><div class="tone-keys">${['2', '3', '5', '7', '8', '9', '--'].map((x) => `<button type="button" data-action="tone-key" data-tone="${x}" ${answered ? 'disabled' : ''}>${x === '--' ? '--' : numberToTone('a' + x)}</button>`).join('')}</div>${!answered ? '<button class="primary" style="width:100%;margin-top:18px" type="submit">檢查答案</button>' : ''}</form>` : session.mode === 'flash' ? `${!answered ? '<button class="primary" style="margin-top:25px" data-action="reveal-card">顯示答案</button>' : ''}` : `<div class="answers">${sessionOptions.map((e, i) => `<div>${session.mode === 'meaning-sound' ? `<div class="row" style="justify-content:center;margin-bottom:9px">${audioButton(e, 0, false, `播放錄音 ${i + 1}`, `錄音 ${i + 1}`)}<span class="small">錄音 ${i + 1}</span></div>` : ''}<button class="answer ${answered ? (keyOf(e) === keyOf(target) ? 'correct' : answered.selected === i ? 'wrong' : '') : ''}" style="width:100%" data-action="answer" data-index="${i}" ${answered ? 'disabled' : ''}>${session.mode === 'meaning-sound' ? `選擇錄音 ${i + 1}` : esc(session.mode === 'sound-hanji' ? wordLabel(e) : e.senses?.[0]?.definition || e.definition)}</button></div>`).join('')}</div>`}</section>${answered ? feedbackHTML(target) : ''}<div class="session-bottom"><button class="text-btn small" data-action="study-entry" data-key="${keyOf(target)}">查看完整詞目</button>${answered && session.mode !== 'flash' ? '<button class="primary" data-action="next-card">下一張 ' + icon('arrow') + '</button>' : ''}${!answered && audioMode ? '<button class="text-btn small" data-action="skip-card">音檔無法播放？先跳過</button>' : ''}</div><p class="source-note">答對後依序於 1、3、7、14、30、60 天後複習；答錯於 10 分鐘後再練。收錄讀音以詞典本調為準，錄音可能包含自然連讀。</p></div>`;
@@ -622,7 +626,12 @@ function renderSession() {
 }
 function feedbackHTML(e) {
   const wrong = !answered.correct;
-  return `<div class="feedback ${wrong ? 'wrong' : ''}"><h3>${answered.reveal ? '記得這個詞嗎？' : answered.correct ? '答對了' : answered.kind === 'tone' ? '拼寫正確，再留意聲調' : '再看一次這個詞'}</h3><p><strong>${esc(wordLabel(e))}</strong>　<span class="roman-inline" style="color:var(--blue)">${esc(e.tailo)}</span></p><p>${esc(e.senses[0].definition)}</p>${answered.reveal ? '<div class="row wrap" style="margin-top:20px"><button class="secondary" data-action="grade-flash" data-correct="false">再練一次</button><button class="primary" data-action="grade-flash" data-correct="true">記得了</button></div>' : ''}</div>`;
+  const ex = studyExample(e);
+  const example =
+    state.session.mode !== 'meaning' && ex
+      ? `<div class="question-context"><div class="row between"><span>${esc(ex.hanji)}</span>${ex.audio_basename ? audioButton(e, ex.id) : ''}</div><p class="roman">${esc(ex.tailo)}</p></div>`
+      : '';
+  return `<div class="feedback ${wrong ? 'wrong' : ''}"><h3>${answered.reveal ? '記得這個詞嗎？' : answered.correct ? '答對了' : answered.kind === 'tone' ? '拼寫正確，再留意聲調' : '再看一次這個詞'}</h3><p><strong>${esc(wordLabel(e))}</strong>　<span class="roman-inline" style="color:var(--blue)">${esc(e.tailo)}</span></p><p>${esc(e.senses[0].definition)}</p>${example}${answered.reveal ? '<div class="row wrap" style="margin-top:20px"><button class="secondary" data-action="grade-flash" data-correct="false">再練一次</button><button class="primary" data-action="grade-flash" data-correct="true">記得了</button></div>' : ''}</div>`;
 }
 function recordAnswer(correct, extra = {}) {
   const target = sessionTarget();
@@ -636,6 +645,11 @@ function recordAnswer(correct, extra = {}) {
   state.session.answered = answered;
   save();
   renderSession();
+  const session = state.session;
+  if (session && session.mode !== 'flash')
+    studyAutoplay
+      .run(`${session.started}:${session.cursor}:${session.mode}:answer`, answerAudioTracks(target))
+      .catch((error) => toast(error.message));
 }
 function checkDictation() {
   const input = $('#dictation-answer').value;
@@ -671,7 +685,7 @@ function finishSession() {
   save();
   $('#main').innerHTML =
     header('練習完成') +
-    `<div class="content study-content"><div class="card empty">${icon('check')}<h1>練習完成</h1><p>完成 ${Math.min(s.cursor, s.queue.length)} 張卡，答對 ${s.score} 張。</p><button class="primary" data-action="study-home">回到學習</button></div></div>`;
+    `<div class="content study-content"><div class="card empty">${icon('check')}<h1>練習完成</h1><p>完成 ${Math.min(s.cursor, s.queue.length)} 張卡，答對 ${s.score} 張。</p><div class="row wrap" style="justify-content:center"><button class="primary" data-action="start-study" data-deck="${esc(s.deck)}" data-mode="${s.mode}">繼續學習</button><button class="secondary" data-action="study-home">回到學習</button></div></div></div>`;
 }
 
 function renderLesson(id) {
