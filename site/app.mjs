@@ -136,7 +136,7 @@ function brandLogos() {
   return '<div class="brand-logos"><span class="personal-logo"><img src="./assets/lenteyyy-logo.png" alt="Lenteyyy 個人 Logo" width="512" height="512"></span><span class="brand-mark" aria-label="台語小辭典 Logo">台</span></div>';
 }
 function header(title) {
-  return `<header class="page-header"><div class="mobile-brand">${brandLogos()}</div><div class="page-title"><div class="eyebrow">台語小辭典</div><h1>${title}</h1></div><button class="icon-btn header-settings" data-action="settings" aria-label="閱讀設定">${icon('settings')}</button></header>`;
+  return `<header class="page-header"><div class="mobile-brand">${brandLogos()}</div><div class="page-title"><div class="eyebrow">台語小辭典</div><h1>${title}</h1></div><button class="secondary header-settings" data-action="settings" aria-label="閱讀設定">${icon('settings')}<span>設定</span></button></header>`;
 }
 function sidebar() {
   const nav = [
@@ -159,6 +159,7 @@ function navigate(next) {
   viewVersion++;
   entryTicket++;
   page = next;
+  $('#main').scrollTop = 0;
   tokenChoices = null;
   sidebar();
   if (['search', 'favorites', 'history'].includes(page)) renderDictionary();
@@ -478,6 +479,7 @@ function renderStudyBase() {
     renderSession();
     return;
   }
+  $('#main').scrollTop = 0;
   $('#main').innerHTML =
     header('學習', '每天幾個詞，一點一點累積。') +
     `<div class="content">${studySummaryHTML()}<div class="study-links"><button data-action="start-study" data-deck="favorites">${icon('bookmark')}從收藏學習</button><button data-action="studied-list">${icon('list')}已學過的詞</button><button data-action="start-study" data-deck="all" data-mode="dictation">${icon('sound')}臺羅聽寫</button></div><div class="section-heading"><h2>常用 700 字詞</h2><span class="pill blue">七課全部開放</span></div><p class="small" style="margin-bottom:20px">依原始序號分課；重複項目合併後共 693 個詞，其中 682 個有釋義可出題。</p><div class="course-grid">${Array.from(
@@ -566,6 +568,13 @@ function pruneUnavailableCards() {
     ...pending.filter((key) => entryCache.get(key)?.senses?.[0]?.definition),
   ];
 }
+function resetStudyScroll(key) {
+  const main = $('#main');
+  if (main.dataset.studyCard !== key) {
+    main.dataset.studyCard = key;
+    main.scrollTop = 0;
+  }
+}
 function renderSession() {
   const session = state.session;
   if (!session) {
@@ -611,6 +620,7 @@ function renderSession() {
   $('#main').innerHTML =
     header('每日學習', '先複習，再學新詞。') +
     `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="pause-study">${icon('back')}暫停並返回</button><select id="study-mode" aria-label="練習方式" ${answered ? 'disabled' : ''}>${MODES.map(([k, v]) => `<option value="${k}" ${session.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="session-progress"><span>第 ${session.cursor + 1}／${session.queue.length} 張</span><span>答對 ${session.score} 張</span></div><div class="progress-track"><span style="width:${(session.cursor / session.queue.length) * 100}%"></span></div><section class="card question-card"><p class="question-kind">${prompt}</p>${audioMode ? audioButton(target, 0, true) : session.mode === 'meaning-sound' ? `<div class="definition" style="margin:28px 0">${esc(target.senses[0].definition)}</div>` : `<h2 class="question-word">${esc(wordLabel(target))}</h2>${session.mode === 'flash' ? `<div class="word-roman">${esc(target.tailo)}</div>` : ''}${audioButton(target)}`}${session.mode === 'meaning' && ex ? `<div class="question-context"><div class="row between"><span>${esc(ex.hanji)}</span>${ex.audio_basename ? audioButton(target, ex.id) : ''}</div><p class="roman">${esc(ex.tailo)}</p>${exampleTranslationHTML(ex)}</div>` : ''}${session.mode === 'dictation' ? `<form id="dictation-form"><input class="dictation" id="dictation-answer" aria-label="輸入臺羅答案" placeholder="例如：ho2 或 hó" autocomplete="off" autocapitalize="off" spellcheck="false" ${answered ? 'disabled' : ''} value="${esc(answered?.input || '')}"><div class="tone-keys">${['2', '3', '5', '7', '8', '9', '--'].map((x) => `<button type="button" data-action="tone-key" data-tone="${x}" ${answered ? 'disabled' : ''}>${x === '--' ? '--' : numberToTone('a' + x)}</button>`).join('')}</div>${!answered ? '<button class="primary" style="width:100%;margin-top:18px" type="submit">檢查答案</button>' : ''}</form>` : session.mode === 'flash' ? `${!answered ? '<button class="primary" style="margin-top:25px" data-action="reveal-card">顯示答案</button>' : ''}` : `<div class="answers">${sessionOptions.map((e, i) => `<div>${session.mode === 'meaning-sound' ? `<div class="row" style="justify-content:center;margin-bottom:9px">${audioButton(e, 0, false, `播放錄音 ${i + 1}`, `錄音 ${i + 1}`)}<span class="small">錄音 ${i + 1}</span></div>` : ''}<button class="answer ${answered ? (keyOf(e) === keyOf(target) ? 'correct' : answered.selected === i ? 'wrong' : '') : ''}" style="width:100%" data-action="answer" data-index="${i}" ${answered ? 'disabled' : ''}>${session.mode === 'meaning-sound' ? `選擇錄音 ${i + 1}` : esc(session.mode === 'sound-hanji' ? wordLabel(e) : e.senses?.[0]?.definition || e.definition)}</button></div>`).join('')}</div>`}</section>${answered ? feedbackHTML(target) : ''}<div class="session-bottom"><button class="text-btn small" data-action="study-entry" data-key="${keyOf(target)}">查看完整詞目</button>${answered && session.mode !== 'flash' ? '<button class="primary" data-action="next-card">下一張 ' + icon('arrow') + '</button>' : ''}${!answered && audioMode ? '<button class="text-btn small" data-action="skip-card">音檔無法播放？先跳過</button>' : ''}</div><p class="source-note">答對後依序於 1、3、7、14、30、60 天後複習；答錯於 10 分鐘後再練。收錄讀音以詞典本調為準，錄音可能包含自然連讀。</p></div>`;
+  resetStudyScroll(`${session.started}:${session.cursor}`);
   const form = $('#dictation-form');
   if (form)
     form.addEventListener('submit', (ev) => {
@@ -687,10 +697,12 @@ function finishSession() {
   $('#main').innerHTML =
     header('練習完成') +
     `<div class="content study-content"><div class="card empty">${icon('check')}<h1>練習完成</h1><p>完成 ${Math.min(s.cursor, s.queue.length)} 張卡，答對 ${s.score} 張。</p><div class="row wrap" style="justify-content:center"><button class="primary" data-action="start-study" data-deck="${esc(s.deck)}" data-mode="${s.mode}">繼續學習</button><button class="secondary" data-action="study-home">回到學習</button></div></div></div>`;
+  $('#main').scrollTop = 0;
 }
 
 function renderLesson(id) {
   studyAutoplay.cancel();
+  $('#main').scrollTop = 0;
   const unit = LESSONS.find((x) => x.id === id);
   if (!unit) return;
   unitQuiz = null;
@@ -736,11 +748,13 @@ function renderUnitQuiz() {
     $('#main').innerHTML =
       header('練習完成', '臺羅基礎') +
       `<div class="content study-content"><div class="card empty">${icon('check')}<h2>完成 ${u.questions.length} 題，答對 ${u.score} 題</h2><button class="primary" data-action="lesson" data-id="${u.id}">回到單元</button><button class="secondary" data-action="study-home">回到學習</button></div></div>`;
+    resetStudyScroll(`unit:${u.id}:${u.cursor}`);
     return;
   }
   $('#main').innerHTML =
     header('臺羅練習', '先聽清楚，再選答案。') +
     `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="lesson" data-id="${u.id}">${icon('back')}回到單元</button><span class="small">第 ${u.cursor + 1}／${u.questions.length} 題</span></div><section class="card question-card"><h2>${esc(q.q)}</h2>${q.sound ? `<button class="big-play" data-action="local-audio" data-sound="${q.sound}" data-audio-label="範例音" aria-label="播放範例音">${icon('sound')}</button>` : q.entry ? audioButton(entryCache.get(q.entry), 0, true, '播放範例音', '範例音') : ''}<div class="answers">${q.options.map((o) => `<button class="answer ${u.answer !== null ? (o === q.answer ? 'correct' : o === u.answer ? 'wrong' : '') : ''}" data-action="unit-answer" data-answer="${esc(o)}" ${u.answer !== null ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div></section>${u.answer !== null ? `<div class="feedback ${u.answer === q.answer ? '' : 'wrong'}"><h3>${u.answer === q.answer ? '答對了' : '正確答案：' + esc(q.answer)}</h3></div><div class="session-bottom"><span></span><button class="primary" data-action="unit-next">下一題 ${icon('arrow')}</button></div>` : ''}</div>`;
+  resetStudyScroll(`unit:${u.id}:${u.cursor}`);
   if (u.answer === null)
     studyAutoplay
       .run(
@@ -770,6 +784,7 @@ async function listEntries(k) {
   return getEntries(state.lists.find((l) => l.id === k)?.entries || []);
 }
 async function renderLists() {
+  $('#main').scrollTop = 0;
   const current = listKey;
   $('#main').innerHTML =
     header('詞表', '收藏、課程與自己的詞，放在一起管理。') +

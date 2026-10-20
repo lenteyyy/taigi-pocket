@@ -15,11 +15,17 @@
   --red-soft: #fff0ed;
   --shadow: 0 12px 45px #22385812;
   --base: 24px;
+  --app-header-height: 104px;
+  --app-nav-height: 0px;
   color-scheme: light;
   font-size: var(--base);
 }
 * {
   box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
 }
 body {
   margin: 0;
@@ -35,6 +41,7 @@ body {
     TaigiFallback,
     sans-serif;
   line-height: 1.65;
+  overflow: hidden;
 }
 button,
 input,
@@ -229,6 +236,17 @@ small,
   display: flex;
   flex-direction: column;
   z-index: 20;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.brand,
+.nav,
+.sidebar-foot {
+  flex-shrink: 0;
 }
 .brand {
   padding: 0 14px 32px;
@@ -366,10 +384,21 @@ small,
 }
 #main {
   margin-left: 230px;
-  min-height: 100vh;
+  min-height: 0;
+  height: calc(100vh - var(--app-nav-height));
+  height: calc(100dvh - var(--app-nav-height));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-top: calc(var(--app-header-height) + 16px);
+  scroll-padding-bottom: 28px;
 }
 .page-header {
-  height: 104px;
+  height: var(--app-header-height);
+  position: sticky;
+  top: 0;
+  z-index: 10;
   padding: 24px 34px;
   display: flex;
   align-items: center;
@@ -381,12 +410,22 @@ small,
 .page-header .eyebrow {
   margin-bottom: 3px;
 }
+.header-settings {
+  width: auto;
+  height: 50px;
+  padding: 8px 12px;
+  font-size: 16px;
+  white-space: nowrap;
+}
 .dictionary {
   display: grid;
   grid-template-columns: minmax(320px, 370px) minmax(0, 1fr);
-  height: calc(100vh - 104px);
+  height: calc(100vh - var(--app-header-height) - var(--app-nav-height));
+  height: calc(100dvh - var(--app-header-height) - var(--app-nav-height));
+  min-height: 0;
 }
 .results {
+  min-height: 0;
   overflow-y: auto;
   background: var(--panel);
   border-right: 1px solid var(--line);
@@ -522,6 +561,7 @@ small,
   color: var(--muted);
 }
 .detail {
+  min-height: 0;
   overflow-y: auto;
   padding: 40px clamp(28px, 4vw, 72px) 70px;
   min-width: 0;
@@ -964,6 +1004,14 @@ small,
   font-size: 0.9rem;
 }
 .session-bottom {
+  position: sticky;
+  bottom: 12px;
+  z-index: 5;
+  padding: 12px 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
   display: flex;
   justify-content: space-between;
   gap: 15px;
@@ -1033,9 +1081,12 @@ small,
 .reading-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(0, 1.1fr);
-  height: calc(100vh - 104px);
+  height: calc(100vh - var(--app-header-height) - var(--app-nav-height));
+  height: calc(100dvh - var(--app-header-height) - var(--app-nav-height));
+  min-height: 0;
 }
 .reading-editor {
+  min-height: 0;
   padding: 28px;
   overflow-y: auto;
   border-right: 1px solid var(--line);
@@ -1127,7 +1178,16 @@ label {
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 25px;
 }
+.list-layout > * {
+  min-width: 0;
+}
 .list-menu {
+  position: sticky;
+  top: calc(var(--app-header-height) + 16px);
+  align-self: start;
+  max-height: calc(100dvh - var(--app-header-height) - var(--app-nav-height) - 48px);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
   display: grid;
   align-content: start;
   gap: 8px;
@@ -1260,6 +1320,9 @@ label {
 }
 .player button:hover {
   background: #ffffff22;
+}
+body:has(.session-bottom) .player {
+  bottom: calc(var(--app-nav-height) + 110px);
 }
 .toast {
   position: fixed;
@@ -1421,12 +1484,39 @@ body.dark .brand-mark {
     padding: 22px;
   }
 }
+@media (min-width: 801px) and (max-height: 760px) {
+  #sidebar {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+  .brand {
+    gap: 8px;
+    padding-bottom: 14px;
+  }
+  .nav {
+    gap: 4px;
+  }
+  .nav button {
+    padding-top: 9px;
+    padding-bottom: 9px;
+    line-height: 1.3;
+  }
+  .sidebar-foot {
+    padding-top: 12px;
+  }
+}
 @media (max-width: 800px) {
+  :root {
+    --app-header-height: 90px;
+    --app-nav-height: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
   #sidebar {
     inset: auto 0 0;
     width: auto;
-    height: 76px;
+    height: var(--app-nav-height);
     padding: 0 5px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    overflow: visible;
     background: var(--panel);
     border-right: 0;
     border-top: 1px solid var(--line);
@@ -1467,10 +1557,9 @@ body.dark .brand-mark {
   }
   #main {
     margin-left: 0;
-    padding-bottom: 76px;
+    padding-bottom: 0;
   }
   .page-header {
-    height: 90px;
     padding: 18px 22px;
     gap: 12px;
   }
@@ -1508,7 +1597,6 @@ body.dark .brand-mark {
   }
   .dictionary,
   .reading-grid {
-    height: calc(100dvh - 166px);
     grid-template-columns: 1fr;
   }
   .dictionary .detail,
@@ -1682,6 +1770,8 @@ body.dark .brand-mark {
     gap: 20px;
   }
   .list-menu {
+    position: static;
+    max-height: none;
     display: flex;
     overflow: auto;
     gap: 7px;
@@ -1717,8 +1807,8 @@ body.dark .brand-mark {
     max-width: 90vw;
   }
   .header-settings {
-    width: 42px;
-    height: 42px;
+    width: auto;
+    height: 44px;
   }
   dialog {
     padding: 23px 20px;
