@@ -610,10 +610,15 @@ small,
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
-.example .translation {
-  font-size: 0.86rem;
+.example .translation,
+.question-context .translation {
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.75;
+  margin-top: 8px;
+}
+.translation-label {
   color: var(--muted);
-  line-height: 1.7;
 }
 .source-note {
   color: var(--muted);

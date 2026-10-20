@@ -5,6 +5,7 @@ import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import initSQL from 'sql.js';
 import { createDictionary, rows } from '../site/dictionary.mjs';
+import { exampleTranslationHTML } from '../site/examples.mjs';
 const root = new URL('../site/data/', import.meta.url);
 const readJSON = async (file) => JSON.parse(await readFile(new URL(file, root), 'utf8'));
 const [SQL, courseMap, soundExamples, exampleAudio, provenance] = await Promise.all([
@@ -25,6 +26,32 @@ async function loadDatabase(source) {
   return databases.get(source);
 }
 const dictionary = createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio });
+test('17,907 筆例句均保留原始繁體華語翻譯，課程與詞目 API 不漏譯', async () => {
+  const all = rows(await loadDatabase('moe'), 'SELECT id,hanji,huagi FROM example');
+  assert.equal(all.length, 17907);
+  for (const example of all) {
+    assert.ok(example.huagi?.trim(), `例句 ${example.id} 缺少華語翻譯`);
+    const html = exampleTranslationHTML(example);
+    assert.ok(html.includes('lang="zh-Hant-TW"'), `例句 ${example.id} 缺少語言標記`);
+    assert.ok(html.includes('華語：'), `例句 ${example.id} 未顯示翻譯`);
+  }
+  const word = await dictionary.getEntry(5014);
+  const example = word.senses.flatMap((sense) => sense.examples).find((ex) => ex.id === 5594);
+  assert.equal(example.hanji, '伊若真正按呢做，就傷超過矣。');
+  assert.equal(example.huagi, '他如果真的這樣做，就太過份了。');
+  const cards = await dictionary.request('/api/course');
+  const examples = cards.flatMap((entry) => entry.senses.flatMap((sense) => sense.examples));
+  assert.equal(examples.length, 1749);
+  assert.ok(examples.every((ex) => ex.huagi?.trim()));
+});
+
+test('華語翻譯以純文字顯示，不執行例句內容中的 HTML', () => {
+  const html = exampleTranslationHTML({ huagi: '<img src=x onerror="alert(1)">&' });
+  assert.ok(html.includes('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;&amp;'));
+  assert.ok(!html.includes('<img'));
+  assert.equal(exampleTranslationHTML({ huagi: ' ' }), '');
+  assert.equal(exampleTranslationHTML(null), '');
+});
 test('全數例句錄音均對應原始音檔名稱，所有播放鍵都有資料', async () => {
   const audioCatalog = await readJSON('audio-catalog.json');
   const all = rows(await loadDatabase('moe'), 'SELECT id,audio_basename FROM example');

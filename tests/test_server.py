@@ -52,6 +52,14 @@ class DictionaryTests(unittest.TestCase):
         self.assertEqual(tokens[-1]['kind'],'unknown')
         self.assertEqual(server.annotate('未')[0]['entries'][0]['marker'],'peh')
 
+    def test_every_example_has_original_traditional_translation(self):
+        with server.db() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM example').fetchone()[0],17907)
+            self.assertEqual(c.execute("SELECT COUNT(*) FROM example WHERE huagi IS NULL OR trim(huagi)=''").fetchone()[0],0)
+        examples=[ex for sense in server.entry(5014)['senses'] for ex in sense['examples']]
+        self.assertEqual(next(ex['huagi'] for ex in examples if ex['id']==5594),'他如果真的這樣做，就太過份了。')
+        self.assertTrue(all(ex['huagi'].strip() for card in server.course() for sense in card['senses'] for ex in sense['examples']))
+
     def test_audio_parser_matches_words_and_examples(self):
         page='<header><button data-src="/media/senn/mp3/imtong/subak/0/1.mp3"></button></header><li class="mb-3"><span class="mb-0">一蕊花</span><button data-src="/media/senn/mp3/imtong/leku/45/45549.mp3"></button></li>'
         parsed=server.parse_audio_page(page)
@@ -88,7 +96,7 @@ class HTTPTests(unittest.TestCase):
             return response.status,response.headers,response.read()
 
     def test_api_and_static_responses(self):
-        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
+        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/examples.mjs','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
             status,headers,payload=self.call(path)
             self.assertEqual(status,200,path)
             self.assertTrue(payload,path)

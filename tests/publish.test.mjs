@@ -20,6 +20,7 @@ test('發布入口以內容版本載入樣式與程式，GitHub 子路徑正確'
     'app.mjs',
     'api.mjs',
     'audio-player.mjs',
+    'examples.mjs',
     'dictionary.mjs',
     'dictionary-worker.js',
   ]) {
