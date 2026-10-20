@@ -8,12 +8,13 @@ import { createDictionary, rows } from '../site/dictionary.mjs';
 import { exampleTranslationHTML } from '../site/examples.mjs';
 const root = new URL('../site/data/', import.meta.url);
 const readJSON = async (file) => JSON.parse(await readFile(new URL(file, root), 'utf8'));
-const [SQL, courseMap, soundExamples, exampleAudio, provenance] = await Promise.all([
+const [SQL, courseMap, soundExamples, exampleAudio, provenance, searchData] = await Promise.all([
   initSQL(),
   readJSON('courses.json'),
   readJSON('sound-examples.json'),
   readJSON('example-audio.json'),
   readJSON('provenance.json'),
+  readJSON('search.json'),
 ]);
 const databases = new Map();
 async function loadDatabase(source) {
@@ -25,7 +26,13 @@ async function loadDatabase(source) {
   }
   return databases.get(source);
 }
-const dictionary = createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio });
+const dictionary = createDictionary({
+  loadDatabase,
+  courseMap,
+  soundExamples,
+  exampleAudio,
+  searchData,
+});
 test('17,907 筆例句均保留原始繁體華語翻譯，課程與詞目 API 不漏譯', async () => {
   const all = rows(await loadDatabase('moe'), 'SELECT id,hanji,huagi FROM example');
   assert.equal(all.length, 17907);
@@ -118,6 +125,63 @@ test('瀏覽器搜尋與本機規則一致，參數不拼入 SQL', async () => {
     0,
   );
   await assert.rejects(dictionary.request('/api/search?mode=bad'), /搜尋模式/);
+});
+test('繁簡與華語別稱找到原始歹囝，別稱結果不重複且保留分頁與分類', async () => {
+  for (const query of ['坏小子', '壞小子', '坏孩子', '不良少年']) {
+    const result = await dictionary.request('/api/search?' + new URLSearchParams({ q: query }));
+    assert.equal(result.entries[0].id, 894, query);
+    assert.equal(result.entries[0].hanji, '歹囝');
+    assert.equal(result.entries[0].tailo, 'pháinn-kiánn');
+    assert.equal(result.via, '華語別稱');
+    assert.equal(new Set(result.entries.map((e) => e.id)).size, result.entries.length);
+  }
+  const next = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: '坏小子', offset: 1 }),
+  );
+  assert.equal(next.total, 1);
+  assert.deepEqual(next.entries, []);
+  const category = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: '坏小子', category: 1 }),
+  );
+  assert.equal(category.total, 0);
+  assert.deepEqual(category.entries, []);
+  assert.equal((await dictionary.getEntry(894)).definition, '不良少年、浪蕩子。');
+});
+test('簡體查詞、華語釋義與例句可逆查，繁體原詞優先排序', async () => {
+  for (const [query, id] of [
+    ['电脑', 10332],
+    ['头毛', 12041],
+    ['自行车', 10126],
+    ['西红柿', 5090],
+  ]) {
+    const result = await dictionary.request('/api/search?' + new URLSearchParams({ q: query }));
+    assert.equal(result.entries[0].id, id, query);
+  }
+  const definition = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: '名词前缀' }),
+  );
+  assert.ok(definition.entries.some((e) => e.id === 4496));
+  const example = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: '他如果真的这样做' }),
+  );
+  assert.equal(example.entries[0].id, 5014);
+  assert.equal(example.via, '華語意思');
+  const native = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: '發', mode: 'exact' }),
+  );
+  assert.equal(native.entries[0].hanji, '發');
+  const wildcard = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: '电*', mode: 'wildcard' }),
+  );
+  assert.ok(wildcard.entries.some((e) => e.id === 10332));
+  const fallback = await dictionary.request(
+    '/api/search?' + new URLSearchParams({ q: 'a̍h有一个', mode: 'exact' }),
+  );
+  assert.equal(fallback.source, 'soannteng');
+  assert.equal(fallback.entries[0].id, 48);
+  assert.equal(fallback.entries[0].hanji, 'a̍h有一個');
+  for (const group of searchData.aliases)
+    assert.ok((await dictionary.getEntry(group.entryId)).senses[0].definition);
 });
 test('七課與六題型使用完整詞條、例句及關聯', async () => {
   const cards = await dictionary.request('/api/course');

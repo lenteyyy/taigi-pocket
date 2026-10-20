@@ -24,7 +24,13 @@ const modules = (await readdir(new URL('site/', root)))
   .filter((name) => /\.(mjs|js)$/.test(name))
   .sort();
 const hash = createHash('sha256');
-for (const file of [...modules, 'style.css', 'data/audio-catalog.json', 'data/example-audio.json'])
+for (const file of [
+  ...modules,
+  'style.css',
+  'data/audio-catalog.json',
+  'data/example-audio.json',
+  'data/search.json',
+])
   hash.update(file).update(await readFile(new URL('site/' + file, root)));
 const version = hash.digest('hex').slice(0, 12);
 for (const file of modules) {

@@ -41,6 +41,7 @@ def db(fallback=False):
     path = DATA / ('taigi-soannteng.sqlite' if fallback else 'taigi-dict.sqlite')
     c = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)
     c.row_factory = sqlite3.Row
+    c.create_function('search_han', 1, normalize_han, deterministic=True)
     try:
         yield c
     finally:
@@ -94,38 +95,63 @@ def brief(row, source='moe'):
 BRIEF_SQL = "SELECT e.*, (SELECT definition FROM sense s WHERE s.entry_id=e.id ORDER BY sense_order LIMIT 1) AS definition FROM entry e "
 
 
+@functools.lru_cache(maxsize=1)
+def search_data():
+    return json.loads((STATIC / 'data/search.json').read_text())
+
+
+@functools.lru_cache(maxsize=200000)
+def normalize_han(value):
+    characters = search_data()['characters']
+    return ''.join(characters.get(ch, ch) for ch in str(value or ''))
+
+
+def search_aliases(query, mode):
+    if mode == 'wildcard' and ('*' in query or '?' in query):
+        return []
+    key = normalize_han(query)
+    return list(dict.fromkeys(group['entryId'] for group in search_data()['aliases']
+                             if any(normalize_han(term) == key for term in group['terms'])))
+
+
 def search(query, mode='prefix', category='', offset=0, limit=70):
     if mode not in ('prefix', 'suffix', 'contains', 'wildcard', 'exact'):
         raise ValueError('搜尋模式不正確。')
     q = query.strip()[:150]
-    params = {'h': pattern(q, mode), 'r': pattern(normalize(q), mode), 'q': q, 'romanExact': number_to_tone(q), 'limit': min(limit, 150), 'offset': max(0, offset)}
+    normalized = normalize_han(q)
+    aliases = search_aliases(q, mode)
+    params = {'h': pattern(normalized, mode), 'r': pattern(normalize(q), mode), 'q': normalized, 'raw': q, 'romanExact': number_to_tone(q), 'limit': min(limit, 150), 'offset': max(0, offset)}
+    for i, eid in enumerate(aliases):
+        params['alias' + str(i)] = eid
+    alias_condition = 'e.id IN (' + ','.join(':alias' + str(i) for i in range(len(aliases))) + ')' if aliases else '0'
     where = []
     if q:
-        where.append("(e.hanji LIKE :h ESCAPE '\\' OR EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo_norm LIKE :r ESCAPE '\\') OR EXISTS(SELECT 1 FROM variant_char v WHERE v.entry_id=e.id AND v.variant LIKE :h ESCAPE '\\'))")
+        where.append("(search_han(e.hanji) LIKE :h ESCAPE '\\' OR EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo_norm LIKE :r ESCAPE '\\') OR EXISTS(SELECT 1 FROM variant_char v WHERE v.entry_id=e.id AND search_han(v.variant) LIKE :h ESCAPE '\\') OR " + alias_condition + ')')
     if category:
         params['category'] = int(category)
         where.append('EXISTS(SELECT 1 FROM entry_category ec JOIN category_minor cm ON cm.id=ec.minor_id WHERE ec.entry_id=e.id AND cm.major_id=:category)')
     condition = ' WHERE ' + ' AND '.join(where) if where else ''
     with db() as c:
         total = c.execute('SELECT COUNT(*) FROM entry e' + condition, params).fetchone()[0]
-        rows = c.execute(BRIEF_SQL + condition + ' ORDER BY CASE WHEN e.hanji=:q THEN 0 WHEN EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo=:romanExact) THEN 1 ELSE 2 END,e.id LIMIT :limit OFFSET :offset', params).fetchall()
-        via = ''
+        order = ' ORDER BY CASE WHEN e.hanji=:raw THEN 0 WHEN search_han(e.hanji)=:q THEN 1 WHEN EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo=:romanExact) THEN 2 WHEN ' + alias_condition + ' THEN 3 ELSE 4 END,e.id LIMIT :limit OFFSET :offset'
+        rows = c.execute(BRIEF_SQL + condition + order, params).fetchall()
+        via = '華語別稱' if aliases and any(r['id'] in aliases for r in rows) and not any(r['hanji'] == q for r in rows) else ''
         if q and not total and not category:
-            # 華語查詢只在詞目找不到時才比對釋義，保留原文。
-            condition = " WHERE EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND s.definition LIKE :h ESCAPE '\\')"
-            params['h'] = '%' + q.replace('%', '\\%').replace('_', '\\_') + '%'
+            condition = " WHERE EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND search_han(s.definition) LIKE :meaning ESCAPE '\\') OR EXISTS(SELECT 1 FROM example ex WHERE ex.entry_id=e.id AND search_han(ex.huagi) LIKE :meaning ESCAPE '\\') OR EXISTS(SELECT 1 FROM dialect_comparison d JOIN dialect_comparison_link l USING(huagi_entry_id) WHERE l.entry_id=e.id AND search_han(d.huagi_term) LIKE :meaning ESCAPE '\\')"
+            params['meaning'] = pattern(normalized, 'contains')
+            params['meaningStart'] = pattern(normalized, 'prefix')
             total = c.execute('SELECT COUNT(*) FROM entry e' + condition, params).fetchone()[0]
-            rows = c.execute(BRIEF_SQL + condition + ' ORDER BY e.id LIMIT :limit OFFSET :offset', params).fetchall()
+            meaning_order = " ORDER BY CASE WHEN EXISTS(SELECT 1 FROM dialect_comparison d JOIN dialect_comparison_link l USING(huagi_entry_id) WHERE l.entry_id=e.id AND search_han(d.huagi_term)=:q) THEN 0 WHEN EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND search_han(s.definition) LIKE :meaningStart ESCAPE '\\') THEN 1 WHEN EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND search_han(s.definition) LIKE :meaning ESCAPE '\\') THEN 2 ELSE 3 END,e.id LIMIT :limit OFFSET :offset"
+            rows = c.execute(BRIEF_SQL + condition + meaning_order, params).fetchall()
             if total:
-                via = '華語釋義'
+                via = '華語意思'
     if total or not q or category:
-        return {'entries': [brief(r) for r in rows], 'total': total, 'offset': offset, 'source': 'moe', 'via': via, 'normalized': normalize(q)}
+        return {'entries': [brief(r) for r in rows], 'total': total, 'offset': offset, 'source': 'moe', 'via': via, 'normalized': normalize(normalized)}
     with db(True) as c:
-        condition = " WHERE hanji LIKE :h ESCAPE '\\' OR tailo_norm LIKE :r ESCAPE '\\' OR hoabun LIKE :h ESCAPE '\\'"
-        params['h'] = pattern(q, mode)
+        condition = " WHERE search_han(hanji) LIKE :h ESCAPE '\\' OR tailo_norm LIKE :r ESCAPE '\\' OR search_han(hoabun) LIKE :h ESCAPE '\\'"
         total = c.execute('SELECT COUNT(*) FROM entry' + condition, params).fetchone()[0]
         rows = c.execute('SELECT * FROM entry' + condition + ' ORDER BY id LIMIT :limit OFFSET :offset', params).fetchall()
-    return {'entries': [brief(r, 'soannteng') for r in rows], 'total': total, 'offset': offset, 'source': 'soannteng', 'via': '', 'normalized': normalize(q)}
+    return {'entries': [brief(r, 'soannteng') for r in rows], 'total': total, 'offset': offset, 'source': 'soannteng', 'via': '', 'normalized': normalize(normalized)}
 
 
 @functools.lru_cache(maxsize=2000)

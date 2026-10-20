@@ -168,7 +168,7 @@ function navigate(next) {
 }
 
 function searchTools() {
-  return `<div class="search-tools"><div class="search-box">${icon('search')}<input id="search-input" type="search" value="${esc(query)}" placeholder="漢字、臺羅、白話字" aria-label="搜尋詞目" autocomplete="off"><button data-action="clear-search" class="clear" aria-label="清除搜尋">${icon('close')}</button></div><div class="segments" aria-label="搜尋方式">${[
+  return `<div class="search-tools"><div class="search-box">${icon('search')}<input id="search-input" type="search" value="${esc(query)}" placeholder="繁簡漢字、臺羅或華語意思" aria-label="搜尋詞目" autocomplete="off"><button data-action="clear-search" class="clear" aria-label="清除搜尋">${icon('close')}</button></div><div class="segments" aria-label="搜尋方式">${[
     ['prefix', '前綴'],
     ['contains', '包含'],
     ['suffix', '後綴'],

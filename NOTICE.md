@@ -4,7 +4,7 @@
 
 補充詞典：台文華文線頂辭典。基礎資料由 Tēⁿ Liông-úi（鄭良偉）教授提供；資料增加及編修為 Iûⁿ Ún-giân（楊允言）教授與打字、校對義工。來源 https://github.com/ChhoeTaigi/ChhoeTaigiDatabase ，以其中 ChhoeTaigi_TaihoaSoanntengTuichiautian 資料為準，CC BY-SA 4.0，https://creativecommons.org/licenses/by-sa/4.0/ 。本專案的該資料副本與技術格式轉換繼續使用 CC BY-SA 4.0；未將此授權概括套用至該倉庫其他詞庫。
 
-錄音：教育部原始錄音，依前述 CC BY-ND 3.0 臺灣條款使用。網頁按需連至官方音檔，不分發參考 App 內附的課程 MP3。課程改用教育部詞目作為例字，並標明完整字音。詞目音檔路徑已用官方頁面核對；例句只有經官方頁面原文比對的網址納入 site/data/example-audio.json，其餘於官方詞目頁播放，沒有以本地例句 id 猜測網址。
+錄音：教育部原始錄音，依前述 CC BY-ND 3.0 臺灣條款使用。網頁按需連至官方音檔，不分發參考 App 內附的課程 MP3。課程改用教育部詞目作為例字，並標明完整字音。詞目音檔路徑已用官方頁面核對；例句只有經官方頁面原文比對的網址納入 site/data/example-audio.json，其餘使用下述鏡像原檔在站內播放，沒有以本地例句 id 猜測網址。
 
 臺羅課程參考教育部臺羅拼音方案使用手冊 https://language.moe.gov.tw/files/people_files/tshiutsheh_1140819.pdf 及臺羅標注說明 https://sutian.moe.edu.tw/zh-hant/piantsip/tailo-phiautsu-suatbing/ 。課程說明為本專案獨立編寫。七課詞目選用公開教育部詞目資料；編號映射屬檢索用資料，不包含參考 App 的付費判定、程式碼或課程說明文案。
 
@@ -13,6 +13,8 @@
 Plangothic Project：SIL Open Font License 1.1。來源 https://github.com/Fitzgerald-Porthmouth-Koenigsegg/Plangothic_Project ，完整條款見 site/fonts/LICENSE-Plangothic-OFL.txt。
 
 sql.js 1.15.1：MIT。來源 https://github.com/sql-js/sql.js ，完整條款見 site/vendor/LICENSE-sql.js.txt。套件版本與完整性雜湊記錄於 package-lock.json；SQLite 本體為公有領域。
+
+繁簡搜尋字形對照：採用 [OpenCC ver.1.1.9](https://github.com/BYVoid/OpenCC/tree/ver.1.1.9) 的 TSCharacters.txt（Apache-2.0）。原始檔及授權保存於 site/vendor/opencc/；來源與 SHA-256 記錄於 site/data/search.json，由 scripts/prepare_search.py 可重建。僅建立繁簡共用搜尋鍵，詞典原文維持不變。華語別稱為本專案的獨立檢索對照，採 MIT 授權；不改寫詞典釋義。
 
 Lenteyyy 個人 Logo：由專案擁有者提供，擁有者確認已取得完整商用授權。品牌與圖像權利保留，不以 MIT 再授權；僅隨本專案原樣展示，衍生專案應替換自己的 Logo。公開授權聲明不包含擁有者的私人授權契約、電腦路徑或其他資料。
 

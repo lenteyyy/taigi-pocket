@@ -40,6 +40,27 @@ class DictionaryTests(unittest.TestCase):
         self.assertLess(literal['total'],5)
         self.assertTrue(all('%' in e['definition'] for e in literal['entries']))
 
+    def test_simplified_aliases_and_semantic_search(self):
+        for query in ('坏小子','壞小子','坏孩子','不良少年'):
+            result=server.search(query)
+            self.assertEqual(result['entries'][0]['id'],894,query)
+            self.assertEqual(result['entries'][0]['tailo'],'pháinn-kiánn')
+            self.assertEqual(result['via'],'華語別稱')
+            self.assertEqual(len({x['id'] for x in result['entries']}),len(result['entries']))
+        for query,eid in (('电脑',10332),('头毛',12041),('自行车',10126),('西红柿',5090)):
+            self.assertEqual(server.search(query)['entries'][0]['id'],eid,query)
+        self.assertTrue(any(x['id']==4496 for x in server.search('名词前缀')['entries']))
+        self.assertEqual(server.search('他如果真的这样做')['entries'][0]['id'],5014)
+        self.assertEqual(server.search('發','exact')['entries'][0]['hanji'],'發')
+        self.assertTrue(any(x['id']==10332 for x in server.search('电*','wildcard')['entries']))
+        self.assertEqual(server.search('坏小子',offset=1)['entries'],[])
+        self.assertEqual(server.search('坏小子',category='1')['total'],0)
+        self.assertEqual(server.entry(894)['definition'],'不良少年、浪蕩子。')
+        fallback=server.search('a̍h有一个','exact')
+        self.assertEqual(fallback['source'],'soannteng')
+        self.assertEqual(fallback['entries'][0]['id'],48)
+        self.assertEqual(fallback['entries'][0]['hanji'],'a̍h有一個')
+
     def test_entry_relations_examples_and_annotation(self):
         word=server.entry(5570)
         self.assertTrue(word['senses'])
@@ -96,7 +117,7 @@ class HTTPTests(unittest.TestCase):
             return response.status,response.headers,response.read()
 
     def test_api_and_static_responses(self):
-        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/examples.mjs','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
+        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/examples.mjs','/search.mjs','/data/search.json','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
             status,headers,payload=self.call(path)
             self.assertEqual(status,200,path)
             self.assertTrue(payload,path)

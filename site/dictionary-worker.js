@@ -36,8 +36,16 @@ const ready = Promise.all([
   json('./data/sound-examples.json'),
   json('./data/example-audio.json'),
   json('./data/audio-catalog.json'),
-]).then(([module, courseMap, soundExamples, exampleAudio, audioCatalog]) =>
-  module.createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio, audioCatalog }),
+  json('./data/search.json'),
+]).then(([module, courseMap, soundExamples, exampleAudio, audioCatalog, searchData]) =>
+  module.createDictionary({
+    loadDatabase,
+    courseMap,
+    soundExamples,
+    exampleAudio,
+    audioCatalog,
+    searchData,
+  }),
 );
 ready.catch(() => {});
 self.onmessage = async (event) => {

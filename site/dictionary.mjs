@@ -1,4 +1,5 @@
 import { normalizeRoman, numberToTone } from './core.mjs';
+import { createSearchTools } from './search.mjs';
 
 // Made By 冷踢踢
 const BRIEF =
@@ -61,8 +62,18 @@ export function createDictionary({
   soundExamples,
   exampleAudio,
   audioCatalog = { files: {} },
+  searchData = {},
 }) {
   const entryCache = new Map();
+  const searchTools = createSearchTools(searchData);
+  const searchable = new WeakSet();
+  const prepareSearch = (db) => {
+    if (!searchable.has(db)) {
+      db.create_function('search_han', searchTools.normalizeHan);
+      searchable.add(db);
+    }
+    return db;
+  };
   let lexicon = null;
   async function getEntry(id, source = 'moe') {
     if (!['moe', 'soannteng'].includes(source)) throw new Error('資料來源不正確。');
@@ -161,18 +172,29 @@ export function createDictionary({
     const query = (q.get('q') || '').trim().slice(0, 150),
       category = q.get('category') || '';
     const offset = Math.max(0, Math.min(1000000, Math.floor(Number(q.get('offset')) || 0)));
+    const normalized = searchTools.normalizeHan(query);
+    const aliasIDs = searchTools.aliasIDs(query, mode);
     const params = {
-      h: pattern(query, mode),
+      h: pattern(normalized, mode),
       r: pattern(normalizeRoman(query), mode),
-      q: query,
+      q: normalized,
+      raw: query,
       romanExact: numberToTone(query),
       limit: 70,
       offset,
     };
+    const aliasCondition = aliasIDs.length
+      ? `e.id IN (${aliasIDs
+          .map((id, i) => {
+            params['alias' + i] = id;
+            return ':alias' + i;
+          })
+          .join(',')})`
+      : '0';
     const conditions = [];
     if (query)
       conditions.push(
-        "(e.hanji LIKE :h ESCAPE '\\' OR EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo_norm LIKE :r ESCAPE '\\') OR EXISTS(SELECT 1 FROM variant_char v WHERE v.entry_id=e.id AND v.variant LIKE :h ESCAPE '\\'))",
+        `(search_han(e.hanji) LIKE :h ESCAPE '\\' OR EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo_norm LIKE :r ESCAPE '\\') OR EXISTS(SELECT 1 FROM variant_char v WHERE v.entry_id=e.id AND search_han(v.variant) LIKE :h ESCAPE '\\') OR ${aliasCondition})`,
       );
     if (category) {
       params.category = positiveID(category);
@@ -180,20 +202,28 @@ export function createDictionary({
         'EXISTS(SELECT 1 FROM entry_category ec JOIN category_minor cm ON cm.id=ec.minor_id WHERE ec.entry_id=e.id AND cm.major_id=:category)',
       );
     }
-    const db = await loadDatabase('moe');
+    const db = prepareSearch(await loadDatabase('moe'));
     let where = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
     let total = rows(db, 'SELECT COUNT(*) AS count FROM entry e' + where, params)[0].count;
-    const order =
-      ' ORDER BY CASE WHEN e.hanji=:q THEN 0 WHEN EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo=:romanExact) THEN 1 ELSE 2 END,e.id LIMIT :limit OFFSET :offset';
+    const order = ` ORDER BY CASE WHEN e.hanji=:raw THEN 0 WHEN search_han(e.hanji)=:q THEN 1 WHEN EXISTS(SELECT 1 FROM reading r WHERE r.entry_id=e.id AND r.tailo=:romanExact) THEN 2 WHEN ${aliasCondition} THEN 3 ELSE 4 END,e.id LIMIT :limit OFFSET :offset`;
     let found = rows(db, BRIEF + where + order, params),
       via = '';
+    if (
+      aliasIDs.length &&
+      found.some((e) => aliasIDs.includes(e.id)) &&
+      !found.some((e) => e.hanji === query)
+    )
+      via = '華語別稱';
     if (query && !total && !category) {
       where =
-        " WHERE EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND s.definition LIKE :h ESCAPE '\\')";
-      params.h = '%' + query.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_') + '%';
+        " WHERE EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND search_han(s.definition) LIKE :meaning ESCAPE '\\') OR EXISTS(SELECT 1 FROM example ex WHERE ex.entry_id=e.id AND search_han(ex.huagi) LIKE :meaning ESCAPE '\\') OR EXISTS(SELECT 1 FROM dialect_comparison d JOIN dialect_comparison_link l USING(huagi_entry_id) WHERE l.entry_id=e.id AND search_han(d.huagi_term) LIKE :meaning ESCAPE '\\')";
+      params.meaning = pattern(normalized, 'contains');
+      params.meaningStart = pattern(normalized, 'prefix');
       total = rows(db, 'SELECT COUNT(*) AS count FROM entry e' + where, params)[0].count;
-      found = rows(db, BRIEF + where + ' ORDER BY e.id LIMIT :limit OFFSET :offset', params);
-      if (total) via = '華語釋義';
+      const meaningOrder =
+        " ORDER BY CASE WHEN EXISTS(SELECT 1 FROM dialect_comparison d JOIN dialect_comparison_link l USING(huagi_entry_id) WHERE l.entry_id=e.id AND search_han(d.huagi_term)=:q) THEN 0 WHEN EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND search_han(s.definition) LIKE :meaningStart ESCAPE '\\') THEN 1 WHEN EXISTS(SELECT 1 FROM sense s WHERE s.entry_id=e.id AND search_han(s.definition) LIKE :meaning ESCAPE '\\') THEN 2 ELSE 3 END,e.id LIMIT :limit OFFSET :offset";
+      found = rows(db, BRIEF + where + meaningOrder, params);
+      if (total) via = '華語意思';
     }
     if (total || !query || category)
       return {
@@ -202,12 +232,11 @@ export function createDictionary({
         offset,
         source: 'moe',
         via,
-        normalized: normalizeRoman(query),
+        normalized: normalizeRoman(normalized),
       };
-    const other = await loadDatabase('soannteng');
+    const other = prepareSearch(await loadDatabase('soannteng'));
     where =
-      " WHERE hanji LIKE :h ESCAPE '\\' OR tailo_norm LIKE :r ESCAPE '\\' OR hoabun LIKE :h ESCAPE '\\'";
-    params.h = pattern(query, mode);
+      " WHERE search_han(hanji) LIKE :h ESCAPE '\\' OR tailo_norm LIKE :r ESCAPE '\\' OR search_han(hoabun) LIKE :h ESCAPE '\\'";
     total = rows(other, 'SELECT COUNT(*) AS count FROM entry' + where, params)[0].count;
     found = rows(
       other,
@@ -220,7 +249,7 @@ export function createDictionary({
       offset,
       source: 'soannteng',
       via: '',
-      normalized: normalizeRoman(query),
+      normalized: normalizeRoman(normalized),
     };
   }
   async function annotate(text) {

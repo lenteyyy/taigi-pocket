@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 
 test('發布入口以內容版本載入樣式與程式，GitHub 子路徑正確', async () => {
@@ -16,20 +16,18 @@ test('發布入口以內容版本載入樣式與程式，GitHub 子路徑正確'
       '/taigi-pocket/' + file,
     );
   }
-  for (const file of [
-    'app.mjs',
-    'api.mjs',
-    'audio-player.mjs',
-    'examples.mjs',
-    'dictionary.mjs',
-    'dictionary-worker.js',
-  ]) {
+  const modules = (await readdir(new URL('dist/', root))).filter((file) =>
+    /\.(mjs|js)$/.test(file),
+  );
+  let importCount = 0;
+  for (const file of modules) {
     const source = await readFile(new URL('dist/' + file, root), 'utf8');
     const imports = [
       ...source.matchAll(/(?:\bfrom\s*|\bimport\s*\()\s*['"](\.\/[^'"]+\.mjs[^'"]*)['"]/g),
     ];
-    assert.ok(imports.length, file);
+    importCount += imports.length;
     for (const [, target] of imports)
       assert.ok(target.endsWith('?v=' + version), file + ': ' + target);
   }
+  assert.ok(importCount > 0);
 });
