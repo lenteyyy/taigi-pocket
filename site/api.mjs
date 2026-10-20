@@ -1,10 +1,16 @@
+import { exampleSources } from './audio-sources.mjs';
 const serverMode = document.documentElement.dataset.runtime === 'server';
 const base = new URL('.', import.meta.url);
 const pending = new Map();
 let worker = null,
   sequence = 0,
   metadata = null;
-export const assetURL = (path) => new URL(path, base).href;
+export const assetURL = (path) => {
+  const url = new URL(path, base);
+  const version = new URL(import.meta.url).searchParams.get('v');
+  if (version) url.searchParams.set('v', version);
+  return url.href;
+};
 export const exampleHasAudio = (id) =>
   serverMode || metadata?.exampleAudioKeys?.includes(String(id));
 function getWorker() {
@@ -67,23 +73,35 @@ const json = async (path) => {
   return response.json();
 };
 export async function audioURL(entry, example = 0, sound = '') {
+  return (await audioURLs(entry, example, sound))[0];
+}
+export async function audioURLs(entry, example = 0, sound = '') {
   if (sound) {
-    sounds ||= json('data/sound-examples.json');
+    sounds ||= json('data/sound-examples.json').catch((error) => {
+      sounds = null;
+      throw error;
+    });
     const item = (await sounds)[sound];
     if (!item) throw new Error('這個範例目前沒有錄音。');
-    return wordAudioURL(item.entry);
+    return [wordAudioURL(item.entry)];
   }
-  if (serverMode)
-    return assetURL(
-      'api/audio?' + new URLSearchParams({ entry: entry.id, ...(example ? { example } : {}) }),
-    );
+  const local = serverMode
+    ? assetURL(
+        'api/audio?' + new URLSearchParams({ entry: entry.id, ...(example ? { example } : {}) }),
+      )
+    : null;
   if (example) {
-    examples ||= json('data/example-audio.json');
-    const path = (await examples)[String(example)];
-    if (!path) throw new Error('請至教育部原始詞目聆聽這筆例句。');
-    return 'https://sutian.moe.edu.tw' + path;
+    examples ||= Promise.all([
+      json('data/example-audio.json'),
+      json('data/audio-catalog.json'),
+    ]).catch((error) => {
+      examples = null;
+      throw error;
+    });
+    const [official, catalog] = await examples;
+    return [...(local ? [local] : []), ...exampleSources(example, official, catalog)];
   }
-  return wordAudioURL(entry.id);
+  return [local || wordAudioURL(entry.id)];
 }
 export function wordAudioURL(id) {
   if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error('詞目編號不正確。');

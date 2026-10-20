@@ -1,4 +1,5 @@
-import { request, audioURL, exampleHasAudio } from './api.mjs';
+import { createAudioPlayer, createStudyAutoplay, studyAudioTracks } from './audio-player.mjs';
+import { request, audioURLs, exampleHasAudio } from './api.mjs';
 import { mountWidgets } from './widgets.mjs';
 import {
   keyOf,
@@ -83,6 +84,22 @@ audio.hidden = true;
 document.body.append(audio);
 let currentAudioButton = null,
   toastTimer;
+const audioPlayer = createAudioPlayer(audio);
+const studyAutoplay = createStudyAutoplay(
+  ({ key, label, sound }) =>
+    playSound(
+      document.querySelector(
+        sound
+          ? `#main [data-action="local-audio"][data-sound="${sound}"]`
+          : `#main [data-action="audio"][data-key="${key}"]:not([data-example])`,
+      ),
+      key || null,
+      0,
+      sound || '',
+      label,
+    ),
+  stopAudio,
+);
 
 function save() {
   try {
@@ -128,6 +145,7 @@ function sidebar() {
 const empty = (title, text, i = 'read') =>
   `<div class="empty">${icon(i)}<h2>${esc(title)}</h2><p>${esc(text)}</p></div>`;
 function navigate(next) {
+  studyAutoplay.cancel();
   if (!['search', 'favorites', 'history', 'reading', 'study', 'lists'].includes(next)) return;
   if (page === 'reading') readingScroll = $('.reading-editor')?.scrollTop || 0;
   viewVersion++;
@@ -268,11 +286,9 @@ async function getEntries(keys) {
   }
   return results;
 }
-function audioButton(e, example = 0, large = false, label = '') {
-  if (example && !exampleHasAudio(example))
-    return `<a class="icon-btn" href="https://sutian.moe.edu.tw/zh-hant/su/${e.id}/" target="_blank" rel="noopener" aria-label="至教育部聽例句錄音" title="至教育部詞目頁聆聽例句">${icon('sound')}</a>`;
-  const available = example ? true : e.audio;
-  return `<button class="${large ? 'big-play' : 'icon-btn'}" data-action="audio" data-key="${keyOf(e)}" ${example ? `data-example="${example}"` : ''} ${available ? '' : 'disabled'} aria-label="${esc(label || '播放' + (example ? '例句' : '詞目') + '錄音')}" title="${available ? '播放教育部錄音' : '未提供錄音'}">${icon('sound')}</button>`;
+function audioButton(e, example = 0, large = false, label = '', privateLabel = '') {
+  const available = example ? exampleHasAudio(example) : e.audio;
+  return `<button class="${large ? 'big-play' : 'icon-btn'}" data-action="audio" data-key="${keyOf(e)}" ${privateLabel ? `data-audio-label="${esc(privateLabel)}"` : ''} ${example ? `data-example="${example}"` : ''} ${available ? '' : 'disabled'} aria-label="${esc(label || '播放' + (example ? '例句' : '詞目') + '錄音')}" title="${available ? '播放教育部錄音' : '未提供錄音'}">${icon('sound')}</button>`;
 }
 // Made By 冷踢踢
 function notesHTML(key) {
@@ -335,43 +351,50 @@ function updateFavorite(key) {
   if (page === 'favorites') renderDictionary();
 }
 
-async function playSound(button, key, example = 0, sound = '') {
-  const ticket = ++playbackTicket;
-  if (currentAudioButton) currentAudioButton.classList.remove('playing');
-  audio.pause();
+async function playSound(button, key, example = 0, sound = '', privateLabel = '') {
+  stopAudio();
+  const ticket = playbackTicket;
   currentAudioButton = button;
   button?.classList.add('playing');
   try {
     const e = key ? await getEntry(key) : null;
-    if (ticket !== playbackTicket) return;
-    const label = sound
-      ? `範例音 ${sound}`
-      : e
-        ? (example ? '例句：' : '') + wordLabel(e)
-        : '臺語錄音';
+    if (ticket !== playbackTicket) return false;
+    const label =
+      privateLabel ||
+      button?.dataset.audioLabel ||
+      (sound ? `範例音 ${sound}` : e ? (example ? '例句：' : '') + wordLabel(e) : '台語錄音');
     $('#player').innerHTML =
       `${icon('sound')}<span>正在載入：${esc(label)}</span><button data-action="stop-audio" aria-label="停止播放">${icon('close')}</button>`;
     $('#player').hidden = false;
-    const source = await audioURL(e, example, sound);
-    if (ticket !== playbackTicket) return;
-    audio.src = source;
-    await audio.play();
-    if (ticket !== playbackTicket) return;
-    $('#player span').textContent = '正在播放：' + label;
-  } catch {
-    if (ticket !== playbackTicket) return;
-    if (audio.error || audio.readyState === 0) toast('音檔暫時無法播放，請確認網路後再試一次。');
+    const sources = await audioURLs(e, example, sound);
+    if (ticket !== playbackTicket) return false;
+    const completed = await audioPlayer.play(sources, () => {
+      if (ticket === playbackTicket) $('#player span').textContent = '正在播放：' + label;
+    });
+    if (ticket === playbackTicket) {
+      currentAudioButton?.classList.remove('playing');
+      currentAudioButton = null;
+      $('#player').hidden = true;
+    }
+    return completed;
+  } catch (error) {
+    if (ticket !== playbackTicket) return false;
+    toast(
+      error.name === 'NotAllowedError'
+        ? '請點一下播放鈕以啟用錄音。'
+        : error.message || '音檔暫時無法播放，請確認網路後再試一次。',
+    );
     stopAudio();
+    return false;
   }
 }
 function stopAudio() {
   playbackTicket++;
-  audio.pause();
+  audioPlayer.stop();
   currentAudioButton?.classList.remove('playing');
   currentAudioButton = null;
   $('#player').hidden = true;
 }
-audio.addEventListener('ended', stopAudio);
 
 function renderReadingBase() {
   const editor = `<section class="reading-editor"><label class="field-label" for="reading-input">貼上台語漢字或文章</label><textarea id="reading-input" maxlength="5000" placeholder="例如：今仔日天氣真好。">${esc(readingText)}</textarea><div class="row between"><button class="primary" data-action="annotate">${icon('read')}標示讀音</button><button class="text-btn small" data-action="reading-example">試試範例</button></div><p class="small">依詞典標示本調，請依語意確認候選讀音。點選詞語可查釋義、選讀音或聽錄音；虛線為未收錄的字詞。</p><div id="annotation" class="annotation">${annotationHTML()}</div>${state.sentences.length ? `<div class="section-heading"><h3>讀過的句子</h3></div><div class="reading-history">${state.sentences.map((x, i) => `<button data-action="past-sentence" data-index="${i}">${esc(x.slice(0, 22))}${x.length > 22 ? '…' : ''}</button>`).join('')}</div>` : ''}</section>`;
@@ -505,6 +528,7 @@ async function startStudy(deck = 'all', mode = 'meaning') {
     return;
   }
   if (state.session && !confirm('要結束目前的練習，改學這份詞表嗎？')) return;
+  studyAutoplay.cancel();
   state.session = { queue, cursor: 0, score: 0, deck, mode, started: Date.now() };
   sessionPool = pool;
   answered = null;
@@ -581,13 +605,20 @@ function renderSession() {
   const ex = target.senses.flatMap((x) => x.examples || [])[0];
   $('#main').innerHTML =
     header('每日學習', '先複習，再學新詞。') +
-    `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="pause-study">${icon('back')}暫停並返回</button><select id="study-mode" aria-label="練習方式" ${answered ? 'disabled' : ''}>${MODES.map(([k, v]) => `<option value="${k}" ${session.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="session-progress"><span>第 ${session.cursor + 1}／${session.queue.length} 張</span><span>答對 ${session.score} 張</span></div><div class="progress-track"><span style="width:${(session.cursor / session.queue.length) * 100}%"></span></div><section class="card question-card"><p class="question-kind">${prompt}</p>${audioMode ? audioButton(target, 0, true) : session.mode === 'meaning-sound' ? `<div class="definition" style="margin:28px 0">${esc(target.senses[0].definition)}</div>` : `<h2 class="question-word">${esc(wordLabel(target))}</h2>${session.mode === 'flash' ? `<div class="word-roman">${esc(target.tailo)}</div>` : ''}${audioButton(target)}`}${session.mode === 'meaning' && ex ? `<div class="question-context"><div class="row between"><span>${esc(ex.hanji)}</span>${ex.audio_basename ? audioButton(target, ex.id) : ''}</div><p class="roman">${esc(ex.tailo)}</p></div>` : ''}${session.mode === 'dictation' ? `<form id="dictation-form"><input class="dictation" id="dictation-answer" aria-label="輸入臺羅答案" placeholder="例如：ho2 或 hó" autocomplete="off" autocapitalize="off" spellcheck="false" ${answered ? 'disabled' : ''} value="${esc(answered?.input || '')}"><div class="tone-keys">${['2', '3', '5', '7', '8', '9', '--'].map((x) => `<button type="button" data-action="tone-key" data-tone="${x}" ${answered ? 'disabled' : ''}>${x === '--' ? '--' : numberToTone('a' + x)}</button>`).join('')}</div>${!answered ? '<button class="primary" style="width:100%;margin-top:18px" type="submit">檢查答案</button>' : ''}</form>` : session.mode === 'flash' ? `${!answered ? '<button class="primary" style="margin-top:25px" data-action="reveal-card">顯示答案</button>' : ''}` : `<div class="answers">${sessionOptions.map((e, i) => `<div>${session.mode === 'meaning-sound' ? `<div class="row" style="justify-content:center;margin-bottom:9px">${audioButton(e)}<span class="small">錄音 ${i + 1}</span></div>` : ''}<button class="answer ${answered ? (keyOf(e) === keyOf(target) ? 'correct' : answered.selected === i ? 'wrong' : '') : ''}" style="width:100%" data-action="answer" data-index="${i}" ${answered ? 'disabled' : ''}>${session.mode === 'meaning-sound' ? `選擇錄音 ${i + 1}` : esc(session.mode === 'sound-hanji' ? wordLabel(e) : e.senses?.[0]?.definition || e.definition)}</button></div>`).join('')}</div>`}</section>${answered ? feedbackHTML(target) : ''}<div class="session-bottom"><button class="text-btn small" data-action="study-entry" data-key="${keyOf(target)}">查看完整詞目</button>${answered && session.mode !== 'flash' ? '<button class="primary" data-action="next-card">下一張 ' + icon('arrow') + '</button>' : ''}${!answered && audioMode ? '<button class="text-btn small" data-action="skip-card">音檔無法播放？先跳過</button>' : ''}</div><p class="source-note">答對後依序於 1、3、7、14、30、60 天後複習；答錯於 10 分鐘後再練。收錄讀音以詞典本調為準，錄音可能包含自然連讀。</p></div>`;
+    `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="pause-study">${icon('back')}暫停並返回</button><select id="study-mode" aria-label="練習方式" ${answered ? 'disabled' : ''}>${MODES.map(([k, v]) => `<option value="${k}" ${session.mode === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div class="session-progress"><span>第 ${session.cursor + 1}／${session.queue.length} 張</span><span>答對 ${session.score} 張</span></div><div class="progress-track"><span style="width:${(session.cursor / session.queue.length) * 100}%"></span></div><section class="card question-card"><p class="question-kind">${prompt}</p>${audioMode ? audioButton(target, 0, true) : session.mode === 'meaning-sound' ? `<div class="definition" style="margin:28px 0">${esc(target.senses[0].definition)}</div>` : `<h2 class="question-word">${esc(wordLabel(target))}</h2>${session.mode === 'flash' ? `<div class="word-roman">${esc(target.tailo)}</div>` : ''}${audioButton(target)}`}${session.mode === 'meaning' && ex ? `<div class="question-context"><div class="row between"><span>${esc(ex.hanji)}</span>${ex.audio_basename ? audioButton(target, ex.id) : ''}</div><p class="roman">${esc(ex.tailo)}</p></div>` : ''}${session.mode === 'dictation' ? `<form id="dictation-form"><input class="dictation" id="dictation-answer" aria-label="輸入臺羅答案" placeholder="例如：ho2 或 hó" autocomplete="off" autocapitalize="off" spellcheck="false" ${answered ? 'disabled' : ''} value="${esc(answered?.input || '')}"><div class="tone-keys">${['2', '3', '5', '7', '8', '9', '--'].map((x) => `<button type="button" data-action="tone-key" data-tone="${x}" ${answered ? 'disabled' : ''}>${x === '--' ? '--' : numberToTone('a' + x)}</button>`).join('')}</div>${!answered ? '<button class="primary" style="width:100%;margin-top:18px" type="submit">檢查答案</button>' : ''}</form>` : session.mode === 'flash' ? `${!answered ? '<button class="primary" style="margin-top:25px" data-action="reveal-card">顯示答案</button>' : ''}` : `<div class="answers">${sessionOptions.map((e, i) => `<div>${session.mode === 'meaning-sound' ? `<div class="row" style="justify-content:center;margin-bottom:9px">${audioButton(e, 0, false, `播放錄音 ${i + 1}`, `錄音 ${i + 1}`)}<span class="small">錄音 ${i + 1}</span></div>` : ''}<button class="answer ${answered ? (keyOf(e) === keyOf(target) ? 'correct' : answered.selected === i ? 'wrong' : '') : ''}" style="width:100%" data-action="answer" data-index="${i}" ${answered ? 'disabled' : ''}>${session.mode === 'meaning-sound' ? `選擇錄音 ${i + 1}` : esc(session.mode === 'sound-hanji' ? wordLabel(e) : e.senses?.[0]?.definition || e.definition)}</button></div>`).join('')}</div>`}</section>${answered ? feedbackHTML(target) : ''}<div class="session-bottom"><button class="text-btn small" data-action="study-entry" data-key="${keyOf(target)}">查看完整詞目</button>${answered && session.mode !== 'flash' ? '<button class="primary" data-action="next-card">下一張 ' + icon('arrow') + '</button>' : ''}${!answered && audioMode ? '<button class="text-btn small" data-action="skip-card">音檔無法播放？先跳過</button>' : ''}</div><p class="source-note">答對後依序於 1、3、7、14、30、60 天後複習；答錯於 10 分鐘後再練。收錄讀音以詞典本調為準，錄音可能包含自然連讀。</p></div>`;
   const form = $('#dictation-form');
   if (form)
     form.addEventListener('submit', (ev) => {
       ev.preventDefault();
       checkDictation();
     });
+  if (!answered)
+    studyAutoplay
+      .run(
+        `${session.started}:${session.cursor}:${session.mode}`,
+        studyAudioTracks(target, session.mode, sessionOptions),
+      )
+      .catch((error) => toast(error.message));
 }
 function feedbackHTML(e) {
   const wrong = !answered.correct;
@@ -596,6 +627,7 @@ function feedbackHTML(e) {
 function recordAnswer(correct, extra = {}) {
   const target = sessionTarget();
   if (!target || (answered && !answered.reveal)) return;
+  studyAutoplay.cancel();
   const key = keyOf(target);
   recordStudyActivity(state, key, !state.progress[key]);
   state.progress[key] = nextReview(state.progress[key], correct);
@@ -619,7 +651,7 @@ function checkDictation() {
   recordAnswer(result.correct, { input, kind: result.kind });
 }
 function nextCard() {
-  stopAudio();
+  studyAutoplay.cancel();
   state.session.cursor++;
   answered = null;
   delete state.session.answered;
@@ -632,6 +664,7 @@ function nextCard() {
   }
 }
 function finishSession() {
+  studyAutoplay.cancel();
   const s = state.session;
   state.session = null;
   sessionPool = [];
@@ -642,6 +675,7 @@ function finishSession() {
 }
 
 function renderLesson(id) {
+  studyAutoplay.cancel();
   const unit = LESSONS.find((x) => x.id === id);
   if (!unit) return;
   unitQuiz = null;
@@ -683,6 +717,7 @@ function renderUnitQuiz() {
   const u = unitQuiz;
   const q = u.questions[u.cursor];
   if (!q) {
+    studyAutoplay.cancel();
     $('#main').innerHTML =
       header('練習完成', '臺羅基礎') +
       `<div class="content study-content"><div class="card empty">${icon('check')}<h2>完成 ${u.questions.length} 題，答對 ${u.score} 題</h2><button class="primary" data-action="lesson" data-id="${u.id}">回到單元</button><button class="secondary" data-action="study-home">回到學習</button></div></div>`;
@@ -690,7 +725,18 @@ function renderUnitQuiz() {
   }
   $('#main').innerHTML =
     header('臺羅練習', '先聽清楚，再選答案。') +
-    `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="lesson" data-id="${u.id}">${icon('back')}回到單元</button><span class="small">第 ${u.cursor + 1}／${u.questions.length} 題</span></div><section class="card question-card"><h2>${esc(q.q)}</h2>${q.sound ? `<button class="big-play" data-action="local-audio" data-sound="${q.sound}" aria-label="播放範例音">${icon('sound')}</button>` : q.entry ? audioButton(entryCache.get(q.entry), 0, true) : ''}<div class="answers">${q.options.map((o) => `<button class="answer ${u.answer !== null ? (o === q.answer ? 'correct' : o === u.answer ? 'wrong' : '') : ''}" data-action="unit-answer" data-answer="${esc(o)}" ${u.answer !== null ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div></section>${u.answer !== null ? `<div class="feedback ${u.answer === q.answer ? '' : 'wrong'}"><h3>${u.answer === q.answer ? '答對了' : '正確答案：' + esc(q.answer)}</h3></div><div class="session-bottom"><span></span><button class="primary" data-action="unit-next">下一題 ${icon('arrow')}</button></div>` : ''}</div>`;
+    `<div class="content study-content"><div class="study-toolbar"><button class="text-btn" data-action="lesson" data-id="${u.id}">${icon('back')}回到單元</button><span class="small">第 ${u.cursor + 1}／${u.questions.length} 題</span></div><section class="card question-card"><h2>${esc(q.q)}</h2>${q.sound ? `<button class="big-play" data-action="local-audio" data-sound="${q.sound}" data-audio-label="範例音" aria-label="播放範例音">${icon('sound')}</button>` : q.entry ? audioButton(entryCache.get(q.entry), 0, true, '播放範例音', '範例音') : ''}<div class="answers">${q.options.map((o) => `<button class="answer ${u.answer !== null ? (o === q.answer ? 'correct' : o === u.answer ? 'wrong' : '') : ''}" data-action="unit-answer" data-answer="${esc(o)}" ${u.answer !== null ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div></section>${u.answer !== null ? `<div class="feedback ${u.answer === q.answer ? '' : 'wrong'}"><h3>${u.answer === q.answer ? '答對了' : '正確答案：' + esc(q.answer)}</h3></div><div class="session-bottom"><span></span><button class="primary" data-action="unit-next">下一題 ${icon('arrow')}</button></div>` : ''}</div>`;
+  if (u.answer === null)
+    studyAutoplay
+      .run(
+        `unit:${u.id}:${u.cursor}`,
+        q.sound
+          ? [{ sound: q.sound, label: '範例音' }]
+          : q.entry
+            ? [{ key: q.entry, label: '範例音' }]
+            : [],
+      )
+      .catch((error) => toast(error.message));
 }
 
 function listName(k) {
@@ -922,7 +968,7 @@ function settings() {
 function sources() {
   showDialog(
     '資料來源與使用說明',
-    `<div class="source-panel"><p>主詞典收錄 ${meta.dictionaryCount.toLocaleString('zh-TW')} 筆詞目，另可查詢 ${meta.fallbackCount.toLocaleString('zh-TW')} 筆線頂辭典資料；兩者分開呈現，未當作去重詞彙總數。</p><p><a href="https://sutian.moe.edu.tw/zh-hant/piantsip/pankhuan-singbing/" target="_blank" rel="noopener">教育部《臺灣台語常用詞辭典》</a><br>詞目、釋義、例句與語音依 CC BY-ND 3.0 臺灣授權，本文與錄音未改寫。</p><p><a href="https://github.com/ChhoeTaigi/ChhoeTaigiDatabase" target="_blank" rel="noopener">台文華文線頂辭典</a><br>基礎資料：鄭良偉教授；增加編修：楊允言教授與打字、校對義工。資料依 CC BY-SA 4.0 授權；SQLite 格式轉換及搜尋索引不變更原文。</p><p>常用字詞依教育部推薦用字範圍及所附課程映射分七課，去重後共 693 張卡。課程說明由本專案獨立編寫，參考<a href="${MANUAL_SOURCE}" target="_blank" rel="noopener">教育部臺羅拼音方案使用手冊</a>。</p><p>生僻字使用國家發展委員會 CNS11643 全字庫正宋體（政府資料開放授權條款第 1 版），另使用 Plangothic Project，依 <a href="./fonts/LICENSE-Plangothic-OFL.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a> 授權。</p><p>查詞、標音及學習資料在本機處理。課程與詞目使用教育部原始例字錄音，播放時需要網路。線上版尚未核對音檔網址的例句會開啟官方詞目頁，避免以不同版本的編號播放錯誤錄音。主音讀不代表所有異讀或腔口都有獨立錄音。</p><p>個人 Logo：Lenteyyy，保留品牌及圖像權利，不包含在程式碼 MIT 授權內。程式碼署名：Made By 冷踢踢。私人筆記僅存於目前瀏覽器，並納入匯出備份。</p><p>本版採 MIT 授權開放程式碼。詞典、字型與 Logo 另依各自授權使用。<a href="https://github.com/lenteyyy/taigi-pocket" target="_blank" rel="noopener">GitHub 原始碼</a>。<br>本版提供詞典、收藏、自建詞表、七課學習、臺羅聽寫、讀音與閱讀、發音課程、備份及大字設定。系統桌面小工具及跨應用程式擴充不屬於網頁功能。所有功能開放，不收費。</p></div>`,
+    `<div class="source-panel"><p>主詞典收錄 ${meta.dictionaryCount.toLocaleString('zh-TW')} 筆詞目，另可查詢 ${meta.fallbackCount.toLocaleString('zh-TW')} 筆線頂辭典資料；兩者分開呈現，未當作去重詞彙總數。</p><p><a href="https://sutian.moe.edu.tw/zh-hant/piantsip/pankhuan-singbing/" target="_blank" rel="noopener">教育部《臺灣台語常用詞辭典》</a><br>詞目、釋義、例句與語音依 CC BY-ND 3.0 臺灣授權，本文與錄音未改寫。</p><p><a href="https://github.com/ChhoeTaigi/ChhoeTaigiDatabase" target="_blank" rel="noopener">台文華文線頂辭典</a><br>基礎資料：鄭良偉教授；增加編修：楊允言教授與打字、校對義工。資料依 CC BY-SA 4.0 授權；SQLite 格式轉換及搜尋索引不變更原文。</p><p>常用字詞依教育部推薦用字範圍及所附課程映射分七課，去重後共 693 張卡。課程說明由本專案獨立編寫，參考<a href="${MANUAL_SOURCE}" target="_blank" rel="noopener">教育部臺羅拼音方案使用手冊</a>。</p><p>生僻字使用國家發展委員會 CNS11643 全字庫正宋體（政府資料開放授權條款第 1 版），另使用 Plangothic Project，依 <a href="./fonts/LICENSE-Plangothic-OFL.txt" target="_blank" rel="noopener">SIL Open Font License 1.1</a> 授權。</p><p>查詞、標音及學習資料在本機處理。課程與詞目使用教育部原始例字錄音，播放時需要網路。17,907 筆例句錄音已對照官方下載索引與 <a href="https://github.com/ChhoeTaigi/KipSutianDataMirror" target="_blank" rel="noopener">ChhoeTaigi 公開鏡像</a>，於站內播放；來源失敗時自動改用備援。主音讀不代表所有異讀或腔口都有獨立錄音。開始學習及換詞時自動播放，看詞義辨音依序播放選項；暫停或離開學習即停止。</p><p>個人 Logo：Lenteyyy，保留品牌及圖像權利，不包含在程式碼 MIT 授權內。程式碼署名：Made By 冷踢踢。私人筆記僅存於目前瀏覽器，並納入匯出備份。</p><p>本版採 MIT 授權開放程式碼。詞典、字型與 Logo 另依各自授權使用。<a href="https://github.com/lenteyyy/taigi-pocket" target="_blank" rel="noopener">GitHub 原始碼</a>。<br>本版提供詞典、收藏、自建詞表、七課學習、臺羅聽寫、讀音與閱讀、發音課程、備份及大字設定。系統桌面小工具及跨應用程式擴充不屬於網頁功能。所有功能開放，不收費。</p></div>`,
   );
 }
 
@@ -1073,12 +1119,14 @@ document.addEventListener('click', async (event) => {
       await startStudy(b.dataset.deck || 'all', b.dataset.mode || 'meaning');
     else if (a === 'resume-study') await resumeStudy();
     else if (a === 'study-home') {
+      studyAutoplay.cancel();
       sessionPool = [];
       answered = null;
       page = 'study';
       sidebar();
       renderStudy();
     } else if (a === 'pause-study') {
+      studyAutoplay.cancel();
       sessionPool = [];
       save();
       renderStudy();
@@ -1089,6 +1137,7 @@ document.addEventListener('click', async (event) => {
         });
     } else if (a === 'next-card') nextCard();
     else if (a === 'skip-card') {
+      studyAutoplay.cancel();
       delete state.session.options;
       state.session.queue.splice(state.session.cursor, 1);
       if (!state.session.queue.length || state.session.cursor >= state.session.queue.length) {
@@ -1131,11 +1180,13 @@ document.addEventListener('click', async (event) => {
     else if (a === 'unit-quiz') startUnitQuiz(b.dataset.id);
     else if (a === 'unit-answer') {
       if (unitQuiz.answer === null) {
+        studyAutoplay.cancel();
         unitQuiz.answer = b.dataset.answer;
         if (unitQuiz.answer === unitQuiz.questions[unitQuiz.cursor].answer) unitQuiz.score++;
         renderUnitQuiz();
       }
     } else if (a === 'unit-next') {
+      studyAutoplay.cancel();
       unitQuiz.cursor++;
       unitQuiz.answer = null;
       renderUnitQuiz();

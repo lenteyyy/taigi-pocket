@@ -55,7 +55,13 @@ const positiveID = (value) => {
   if (!Number.isSafeInteger(id) || id <= 0) throw new Error('詞目編號不正確。');
   return id;
 };
-export function createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio }) {
+export function createDictionary({
+  loadDatabase,
+  courseMap,
+  soundExamples,
+  exampleAudio,
+  audioCatalog = { files: {} },
+}) {
   const entryCache = new Map();
   let lexicon = null;
   async function getEntry(id, source = 'moe') {
@@ -272,7 +278,9 @@ export function createDictionary({ loadDatabase, courseMap, soundExamples, examp
           courseCount: courseMap.length,
           localAudioCount: 0,
           soundExamples,
-          exampleAudioKeys: Object.keys(exampleAudio),
+          exampleAudioKeys: [
+            ...new Set([...Object.keys(exampleAudio), ...Object.keys(audioCatalog.files)]),
+          ],
         };
       }
       if (url.pathname === '/api/search') return search(q);

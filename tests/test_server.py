@@ -88,7 +88,7 @@ class HTTPTests(unittest.TestCase):
             return response.status,response.headers,response.read()
 
     def test_api_and_static_responses(self):
-        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/style.css','/data/sound-examples.json'):
+        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
             status,headers,payload=self.call(path)
             self.assertEqual(status,200,path)
             self.assertTrue(payload,path)

@@ -8,26 +8,26 @@
 
 查詞在瀏覽器處理，收藏、筆記與進度留在目前瀏覽器。換裝置或網址前，先在「閱讀設定與備份」匯出 JSON，再於新網址匯入；紀錄不會自動同步。
 
-詞目和課程錄音直接播放教育部原音，需要網路。部分例句尚未核對官方音檔編號，會開啟原始詞目頁聆聽；本機 Python 版可即時解析官方例句。標音顯示詞典本調與候選讀音，不是自動翻譯或完整變調。
+詞目、課程與 17,907 筆例句皆在站內播放原音，需要網路。例句優先使用已核對的教育部網址，其餘由 ChhoeTaigi 公開鏡像提供原檔；來源失敗時自動改用備援，不跳轉網頁。開始、繼續及換詞時自動播放；看詞義辨音會依序播放各選項，臺羅聽辨換題也會播放。暫停或離開學習即停止。標音顯示詞典本調與候選讀音，不是自動翻譯或完整變調。若瀏覽器攔截自動播放，點一次播放鈕再繼續。
 
 本機使用 Python 3，無須安裝套件：
 
-~~~sh
+```sh
 git clone https://github.com/lenteyyy/taigi-pocket.git
 cd taigi-pocket
 python3 server.py
-~~~
+```
 
 開啟 http://127.0.0.1:8765/ 。只想預覽靜態版，可用 python3 -m http.server 8767 --directory site。
 
 開發與檢查使用 Node.js 22 以上：
 
-~~~sh
+```sh
 npm ci
 npm test
 python3 -m unittest discover -s tests -p 'test_*.py'
 npm run build
-~~~
+```
 
 GitHub Pages 由 Actions 發布 dist/；部署前會執行測試。純靜態版以 Web Worker 與 sql.js 查詢壓縮詞典，初次需下載約 6 MB 主詞典；約 2.1 MB 補充詞典按需載入。沒有把 Python 後端放上 Pages。
 

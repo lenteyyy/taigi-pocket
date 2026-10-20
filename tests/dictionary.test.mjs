@@ -25,6 +25,22 @@ async function loadDatabase(source) {
   return databases.get(source);
 }
 const dictionary = createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio });
+test('全數例句錄音均對應原始音檔名稱，所有播放鍵都有資料', async () => {
+  const audioCatalog = await readJSON('audio-catalog.json');
+  const all = rows(await loadDatabase('moe'), 'SELECT id,audio_basename FROM example');
+  assert.equal(all.length, 17907);
+  assert.equal(Object.keys(audioCatalog.files).length, all.length);
+  for (const entry of all)
+    assert.equal(audioCatalog.files[entry.id], entry.audio_basename + '.mp3');
+  const full = createDictionary({
+    loadDatabase,
+    courseMap,
+    soundExamples,
+    exampleAudio,
+    audioCatalog,
+  });
+  assert.equal((await full.request('/api/meta')).exampleAudioKeys.length, all.length);
+});
 test('公開資料快照完整且兩部詞庫分開標示授權', async () => {
   const meta = await dictionary.request('/api/meta');
   assert.equal(meta.dictionaryCount, 29591);

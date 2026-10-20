@@ -5,7 +5,10 @@ const SQL = initSqlJs({
   locateFile: (file) => new URL('./vendor/' + file, self.location.href).href,
 });
 async function json(path) {
-  const response = await fetch(path);
+  const url = new URL(path, self.location.href);
+  const version = new URL(self.location.href).searchParams.get('v');
+  if (version) url.searchParams.set('v', version);
+  const response = await fetch(url);
   if (!response.ok) throw new Error('無法下載詞典資料，請確認網路後重新整理。');
   return response.json();
 }
@@ -32,8 +35,9 @@ const ready = Promise.all([
   json('./data/courses.json'),
   json('./data/sound-examples.json'),
   json('./data/example-audio.json'),
-]).then(([module, courseMap, soundExamples, exampleAudio]) =>
-  module.createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio }),
+  json('./data/audio-catalog.json'),
+]).then(([module, courseMap, soundExamples, exampleAudio, audioCatalog]) =>
+  module.createDictionary({ loadDatabase, courseMap, soundExamples, exampleAudio, audioCatalog }),
 );
 ready.catch(() => {});
 self.onmessage = async (event) => {

@@ -15,3 +15,5 @@ Plangothic Project：SIL Open Font License 1.1。來源 https://github.com/Fitzg
 sql.js 1.15.1：MIT。來源 https://github.com/sql-js/sql.js ，完整條款見 site/vendor/LICENSE-sql.js.txt。套件版本與完整性雜湊記錄於 package-lock.json；SQLite 本體為公有領域。
 
 Lenteyyy 個人 Logo：由專案擁有者提供，擁有者確認已取得完整商用授權。品牌與圖像權利保留，不以 MIT 再授權；僅隨本專案原樣展示，衍生專案應替換自己的 Logo。公開授權聲明不包含擁有者的私人授權契約、電腦路徑或其他資料。
+
+例句原音鏡像：[ChhoeTaigi/KipSutianDataMirror](https://github.com/ChhoeTaigi/KipSutianDataMirror)，固定使用 20261019-0109 版本。17,907 筆檔名同時對照[教育部例句 MP3 下載](https://sutian.moe.edu.tw/zh-hant/siongkuantsuguan/)與鏡像 Git 樹確認；來源與索引雜湊記於 site/data/audio-catalog.json。錄音沿用教育部 CC BY-ND 3.0 TW 授權，未剪輯、轉製或改寫。
