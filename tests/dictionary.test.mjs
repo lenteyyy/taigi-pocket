@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import initSQL from 'sql.js';
 import { createDictionary, rows } from '../site/dictionary.mjs';
 import { exampleTranslationHTML } from '../site/examples.mjs';
+import { searchWithScope } from '../site/search-session.mjs';
 const root = new URL('../site/data/', import.meta.url);
 const readJSON = async (file) => JSON.parse(await readFile(new URL(file, root), 'utf8'));
 const [SQL, courseMap, soundExamples, exampleAudio, provenance, searchData] = await Promise.all([
@@ -32,6 +33,22 @@ const dictionary = createDictionary({
   soundExamples,
   exampleAudio,
   searchData,
+});
+test('動物分類找不到揤時，前端擴大搜尋可找到原詞及臺羅', async () => {
+  const request = (url) => dictionary.request(url);
+  assert.equal((await request('/api/search?q=揤&category=3')).total, 0);
+  const response = await searchWithScope(request, { q: '揤', category: '3' });
+  assert.equal(response.expandedFrom, '3');
+  assert.equal(response.category, '');
+  assert.equal(response.result.total, 2);
+  assert.equal(response.result.entries[0].id, 6001);
+  assert.equal(response.result.entries[0].tailo, 'tshi̍h');
+  const animal = await searchWithScope(request, { q: '小管仔', category: '3' });
+  assert.equal(animal.category, '3');
+  assert.equal(animal.expandedFrom, '');
+  assert.ok(animal.result.total > 0);
+  const alias = await searchWithScope(request, { q: '坏小子', category: '3' });
+  assert.equal(alias.result.entries[0].id, 894);
 });
 test('17,907 筆例句均保留原始繁體華語翻譯，課程與詞目 API 不漏譯', async () => {
   const all = rows(await loadDatabase('moe'), 'SELECT id,hanji,huagi FROM example');

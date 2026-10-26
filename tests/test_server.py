@@ -61,6 +61,14 @@ class DictionaryTests(unittest.TestCase):
         self.assertEqual(fallback['entries'][0]['id'],48)
         self.assertEqual(fallback['entries'][0]['hanji'],'a̍h有一個')
 
+    def test_category_search_keeps_original_entry_available(self):
+        self.assertEqual(server.search('揤', category='3')['total'], 0)
+        result=server.search('揤')
+        self.assertEqual(result['total'], 2)
+        self.assertEqual(result['entries'][0]['id'], 6001)
+        self.assertEqual(result['entries'][0]['tailo'], 'tshi̍h')
+        self.assertGreater(server.search('小管仔', category='3')['total'], 0)
+
     def test_entry_relations_examples_and_annotation(self):
         word=server.entry(5570)
         self.assertTrue(word['senses'])
@@ -117,7 +125,7 @@ class HTTPTests(unittest.TestCase):
             return response.status,response.headers,response.read()
 
     def test_api_and_static_responses(self):
-        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/examples.mjs','/search.mjs','/data/search.json','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
+        for path in ('/api/meta','/api/course','/api/search?q=ho2','/api/entry?id=5570','/api/entries?ids=moe:5570,moe:2415','/assets/lenteyyy-logo.png','/app.mjs','/core.mjs','/examples.mjs','/search.mjs','/search-session.mjs','/data/search.json','/style.css','/data/sound-examples.json','/api.mjs','/audio-player.mjs','/audio-sources.mjs','/data/audio-catalog.json'):
             status,headers,payload=self.call(path)
             self.assertEqual(status,200,path)
             self.assertTrue(payload,path)

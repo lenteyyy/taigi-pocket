@@ -6,6 +6,7 @@ import {
   studyExample,
 } from './audio-player.mjs';
 import { request, audioURLs, exampleHasAudio } from './api.mjs';
+import { searchWithScope } from './search-session.mjs';
 import { mountWidgets } from './widgets.mjs';
 import { exampleTranslationHTML } from './examples.mjs';
 import {
@@ -67,6 +68,7 @@ let state = loadState(),
   offset = 0,
   searchResults = [],
   searchTotal = 0,
+  searchScopeNote = '',
   listKey = 'favorites',
   listFilter = '',
   listStatus = 'all',
@@ -158,6 +160,7 @@ function navigate(next) {
   if (page === 'reading') readingScroll = $('.reading-editor')?.scrollTop || 0;
   viewVersion++;
   entryTicket++;
+  searchToken++;
   page = next;
   $('#main').scrollTop = 0;
   tokenChoices = null;
@@ -181,7 +184,7 @@ function searchTools() {
     )
     .join(
       '',
-    )}</div>${searchMode === 'wildcard' ? '<p class="small" style="margin-top:10px">＊任意字數，? 一個字。例如：日*子</p>' : ''}${category ? `<button class="text-btn small" data-action="clear-category">${esc(meta.categories.find((x) => String(x.id) === category)?.name || '主題')} ${icon('close')}</button>` : ''}</div>`;
+    )}</div>${searchMode === 'wildcard' ? '<p class="small" style="margin-top:10px">＊任意字數，? 一個字。例如：日*子</p>' : ''}${category ? `<button class="text-btn small" data-action="clear-category" aria-label="清除分類篩選">搜尋範圍：${esc(meta.categories.find((x) => String(x.id) === category)?.name || '主題')} ${icon('close')}</button>` : ''}</div>`;
 }
 function rowHTML(e) {
   const k = keyOf(e);
@@ -223,38 +226,67 @@ async function renderDictionary() {
   }
 }
 function bindSearch() {
-  let timer;
-  $('#search-input').addEventListener('input', (event) => {
-    if (event.isComposing) return;
+  const input = $('#search-input');
+  let timer,
+    composing = false;
+  const active = () => input.isConnected && page === 'search';
+  const invalidate = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => {
-      query = event.target.value;
-      offset = 0;
-      loadSearch();
-    }, 220);
-  });
-  $('#search-input').addEventListener('compositionend', (event) => {
-    clearTimeout(timer);
-    query = event.target.value;
+    searchToken++;
+    if (active()) $('#result-list').innerHTML = '<div class="loading">正在查詢…</div>';
+  };
+  const update = (immediate = false) => {
+    if (!active()) return;
+    invalidate();
+    query = input.value;
     offset = 0;
-    loadSearch();
+    if (immediate) loadSearch();
+    else
+      timer = setTimeout(() => {
+        if (active()) loadSearch();
+      }, 220);
+  };
+  input.addEventListener('compositionstart', () => {
+    composing = true;
+    invalidate();
+  });
+  input.addEventListener('input', (event) => {
+    if (composing || event.isComposing) invalidate();
+    else update();
+  });
+  input.addEventListener('compositionend', () => {
+    composing = false;
+    update(true);
   });
 }
 async function loadSearch(append = false) {
   const ticket = ++searchToken;
-  if (!append) offset = 0;
+  if (!append) {
+    offset = 0;
+    searchScopeNote = '';
+  }
   const resultEl = $('#result-list');
   if (!resultEl) return;
-  if (!query && !category) {
+  const isCurrent = () => ticket === searchToken && page === 'search' && resultEl.isConnected;
+  if (!query.trim() && !category) {
     resultEl.innerHTML = `<div class="theme-title">依主題瀏覽</div>${meta.categories.map((c) => `<button class="category-row" data-action="category" data-id="${c.id}"><span>${esc(c.name)}</span><span>${c.entry_count.toLocaleString('zh-TW')} ${icon('arrow')}</span></button>`).join('')}`;
     return;
   }
   if (!append) resultEl.innerHTML = '<div class="loading">正在查詢…</div>';
   try {
-    const result = await request(
-      '/api/search?' + new URLSearchParams({ q: query, mode: searchMode, category, offset }),
+    const response = await searchWithScope(
+      request,
+      { q: query, mode: searchMode, category, offset },
+      isCurrent,
     );
-    if (ticket !== searchToken || page !== 'search') return;
+    if (!response || !isCurrent()) return;
+    const { result, expandedFrom } = response;
+    if (expandedFrom) {
+      const name = meta.categories.find((x) => String(x.id) === expandedFrom)?.name || '目前';
+      searchScopeNote = `「${name}」分類查無符合詞目，已搜尋全部分類。`;
+      category = response.category;
+      $('.search-tools [data-action="clear-category"]')?.remove();
+    }
     searchResults = append ? [...searchResults, ...result.entries] : result.entries;
     searchTotal = result.total;
     const note =
@@ -264,7 +296,7 @@ async function loadSearch(append = false) {
           ? `依${result.via}找到`
           : '';
     resultEl.innerHTML =
-      `<div class="result-count">${note ? esc(note) + '<br>' : ''}共 ${result.total.toLocaleString('zh-TW')} 個詞目</div>` +
+      `<div class="result-count" role="status">${searchScopeNote ? esc(searchScopeNote) + '<br>' : ''}${note ? esc(note) + '<br>' : ''}共 ${result.total.toLocaleString('zh-TW')} 個詞目</div>` +
       (searchResults.length
         ? searchResults.map(rowHTML).join('')
         : empty('查無詞目', '可以試試不加調符，或改用「包含」搜尋。', 'search')) +
@@ -272,7 +304,7 @@ async function loadSearch(append = false) {
         ? '<div style="padding:20px;text-align:center"><button class="secondary" data-action="more-results">顯示更多</button></div>'
         : '');
   } catch (e) {
-    if (ticket === searchToken) resultEl.innerHTML = empty('暫時無法查詞', e.message);
+    if (isCurrent()) resultEl.innerHTML = empty('暫時無法查詞', e.message);
   }
 }
 async function getEntry(key) {
