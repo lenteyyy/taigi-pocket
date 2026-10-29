@@ -369,6 +369,9 @@ small,
   font-size: 15px;
   color: var(--muted);
 }
+.sidebar-foot .personal-logo {
+  margin-top: 12px;
+}
 .settings-btn {
   display: flex;
   align-items: center;
