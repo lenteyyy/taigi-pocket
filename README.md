@@ -1,4 +1,4 @@
-<img src="site/assets/lenteyyy-logo.png" alt="Lenteyyy" width="180">
+<img src="site/assets/taigi-pocket-brand.png" alt="台語小辭典 Taigi Pocket" width="480">
 
 台語小辭典。大字查詞、真人錄音、每日複習。Made By 冷踢踢。
 

@@ -249,7 +249,7 @@ small,
   flex-shrink: 0;
 }
 .brand {
-  padding: 0 14px 32px;
+  padding: 0 0 24px;
   display: flex;
   align-items: flex-start;
   flex-direction: column;
@@ -258,14 +258,28 @@ small,
 /* Made By 冷踢踢 */
 .brand-logos {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   flex-shrink: 0;
+  width: 100%;
+}
+.product-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1356 / 366;
+  padding: 8px;
+  box-sizing: content-box;
+  max-width: calc(100% - 16px);
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
 }
 .personal-logo {
   display: block;
-  width: 108px;
-  height: 48px;
+  width: 72px;
+  height: 32px;
   position: relative;
   overflow: hidden;
   border-radius: 10px;
@@ -273,8 +287,8 @@ small,
 }
 .personal-logo img {
   position: absolute;
-  width: 108px;
-  height: 108px;
+  width: 72px;
+  height: 72px;
   max-width: none;
   top: 50%;
   left: 0;
@@ -321,26 +335,6 @@ small,
 .private-note .row {
   margin-top: 12px;
   gap: 12px;
-}
-.brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  background: var(--blue);
-  color: #fff;
-  font-size: 29px;
-  font-weight: 700;
-}
-.brand-name {
-  font-size: 21px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.brand-sub {
-  font-size: 13px;
-  color: var(--muted);
 }
 .nav {
   display: grid;
@@ -1526,9 +1520,6 @@ body.dark .study-banner .primary {
   background: #eaf2fe;
   color: #164c95;
 }
-body.dark .brand-mark {
-  color: #132238;
-}
 @media (min-width: 1700px) {
   #sidebar {
     width: 260px;
@@ -1559,14 +1550,6 @@ body.dark .brand-mark {
   .brand {
     padding-left: 8px;
     gap: 9px;
-  }
-  .brand-name {
-    font-size: 19px;
-  }
-  .brand-mark {
-    width: 38px;
-    height: 38px;
-    font-size: 25px;
   }
   .nav button {
     padding: 13px 14px;
@@ -1683,22 +1666,27 @@ body.dark .brand-mark {
     display: block;
   }
   .mobile-brand .personal-logo {
-    width: 72px;
-    height: 36px;
+    width: 52px;
+    height: 30px;
     border-radius: 7px;
   }
   .mobile-brand img {
-    width: 76px;
-    height: 76px;
-    left: -2px;
+    width: 52px;
+    height: 52px;
+    left: 0;
   }
-  .mobile-brand .brand-mark {
-    width: 32px;
-    height: 32px;
-    font-size: 23px;
+  .mobile-brand .product-logo {
+    width: 36px;
+    height: 36px;
+    max-width: none;
+    aspect-ratio: 1;
+    padding: 0;
     border-radius: 10px;
+    background: transparent;
   }
   .mobile-brand .brand-logos {
+    flex-wrap: nowrap;
+    width: auto;
     gap: 7px;
   }
   .page-header .header-settings {
