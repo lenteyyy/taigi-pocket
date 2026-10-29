@@ -134,11 +134,11 @@ function toast(message) {
 }
 const marker = (m) => ({ bun: '文讀', peh: '白讀', siok: '俗讀' })[m] || '';
 const wordLabel = (e) => e.hanji.replace(/【替】/g, '');
-function brandLogos() {
-  return '<div class="brand-logos"><span class="personal-logo"><img src="./assets/lenteyyy-logo.png" alt="Lenteyyy 個人 Logo" width="512" height="512"></span><span class="brand-mark" aria-label="台語小辭典 Logo">台</span></div>';
+function brandLogos(compact = false) {
+  return `<div class="brand-logos"><svg class="product-logo" viewBox="${compact ? '390 174 390 390' : '396 184 1356 366'}" role="img" aria-label="台語小辭典 Taigi Pocket 品牌標誌"><image href="./assets/taigi-pocket-brand.png" width="2172" height="724"/></svg><span class="personal-logo"><img src="./assets/lenteyyy-logo.png" alt="Lenteyyy 個人 Logo" width="512" height="512"></span></div>`;
 }
 function header(title) {
-  return `<header class="page-header"><div class="mobile-brand">${brandLogos()}</div><div class="page-title"><div class="eyebrow">台語小辭典</div><h1>${title}</h1></div><button class="secondary header-settings" data-action="settings" aria-label="閱讀設定">${icon('settings')}<span>設定</span></button></header>`;
+  return `<header class="page-header"><div class="mobile-brand">${brandLogos(true)}</div><div class="page-title"><div class="eyebrow">台語小辭典</div><h1>${title}</h1></div><button class="secondary header-settings" data-action="settings" aria-label="閱讀設定">${icon('settings')}<span>設定</span></button></header>`;
 }
 function sidebar() {
   const nav = [
@@ -150,7 +150,7 @@ function sidebar() {
     ['lists', 'list', '詞表'],
   ];
   $('#sidebar').innerHTML =
-    `<div class="brand">${brandLogos()}<div><div class="brand-name">台語小辭典</div><div class="brand-sub">Tâi-gí sió sû-tián</div></div></div><nav class="nav">${nav.map(([id, i, title]) => `<button ${meta ? '' : 'disabled'} data-action="nav" data-page="${id}" class="${page === id ? 'active' : ''}" ${page === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${title}</span>${id === 'favorites' && state.favorites.length ? `<span class="badge">${state.favorites.length}</span>` : ''}</button>`).join('')}</nav><div class="sidebar-foot"><button class="settings-btn" data-action="settings">${icon('settings')}閱讀設定與備份</button><button class="settings-btn" data-action="sources" ${meta ? '' : 'disabled'}>${icon('info')}資料來源</button><div style="margin-top:14px;font-size:13px">Made By 冷踢踢</div></div>`;
+    `<div class="brand">${brandLogos()}</div><nav class="nav">${nav.map(([id, i, title]) => `<button ${meta ? '' : 'disabled'} data-action="nav" data-page="${id}" class="${page === id ? 'active' : ''}" ${page === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${title}</span>${id === 'favorites' && state.favorites.length ? `<span class="badge">${state.favorites.length}</span>` : ''}</button>`).join('')}</nav><div class="sidebar-foot"><button class="settings-btn" data-action="settings">${icon('settings')}閱讀設定與備份</button><button class="settings-btn" data-action="sources" ${meta ? '' : 'disabled'}>${icon('info')}資料來源</button><div style="margin-top:14px;font-size:13px">Made By 冷踢踢</div></div>`;
 }
 const empty = (title, text, i = 'read') =>
   `<div class="empty">${icon(i)}<h2>${esc(title)}</h2><p>${esc(text)}</p></div>`;
