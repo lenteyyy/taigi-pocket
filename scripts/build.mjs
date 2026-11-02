@@ -48,5 +48,12 @@ let index = await readFile(new URL('dist/index.html', root), 'utf8');
 for (const file of ['style.css', 'app.mjs']) {
   index = index.replace(`"./${file}"`, `"./${file}?v=${version}"`);
 }
+// Web Analytics runs only in the published build, never in the local source preview.
+const beacon = `<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{&quot;token&quot;:&quot;caf5e3ce5c0f4c879461f09964737766&quot;}'></script>`;
+index = index.replace(/(<meta http-equiv="Content-Security-Policy" content=")[^"]*(")/i, (tag) =>
+  tag.replace(/script-src ([^;]+)/, 'script-src $1 https://static.cloudflareinsights.com')
+    .replace(/connect-src ([^;]+)/, 'connect-src $1 https://cloudflareinsights.com')
+);
+index = index.replace('</head>', `${beacon}</head>`);
 await writeFile(new URL('dist/index.html', root), index);
 console.log('GitHub Pages 靜態網站已建立：dist/');
