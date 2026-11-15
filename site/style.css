@@ -1034,6 +1034,12 @@ small,
   width: auto;
   max-width: 55%;
   min-width: 0;
+  margin-left: auto;
+}
+.study-session .study-toolbar .icon-btn {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
 }
 .study-session > .progress-track {
   margin-top: 8px;
