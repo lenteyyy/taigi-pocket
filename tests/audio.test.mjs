@@ -8,7 +8,7 @@ import {
   answerAudioTracks,
   studyExample,
 } from '../site/audio-player.mjs';
-import { exampleSources } from '../site/audio-sources.mjs';
+import { exampleSources, wordSources } from '../site/audio-sources.mjs';
 
 const deferred = () => {
   let resolve, reject;
@@ -77,6 +77,60 @@ test('播放完成回傳成功；主音檔失敗後改用備援', async () => {
   assert.equal(await done, true);
 });
 
+test('單字優先使用核對過的原始鏡像，保留官方備援；拒絕錯詞與外部網址', async () => {
+  const catalog = JSON.parse(
+    await readFile(new URL('../site/data/word-audio-catalog.json', import.meta.url)),
+  );
+  assert.equal(Object.keys(catalog.files).length, 22298);
+  for (const id of [1, 2, 4496, 5570, 6001]) {
+    const sources = wordSources(id, catalog);
+    assert.ok(sources[0].endsWith(`/sutiau/${id}(1).mp3`));
+    assert.equal(
+      sources[1],
+      `https://sutian.moe.edu.tw/media/senn/mp3/imtong/subak/${Math.floor(id / 1000)}/${id}.mp3`,
+    );
+  }
+  for (const bad of [
+    { ...catalog, baseURL: 'https://example.com/' },
+    { ...catalog, files: { 1: '2(1).mp3' } },
+    { ...catalog, files: { 1: '../1(1).mp3' } },
+    undefined,
+  ])
+    assert.deepEqual(wordSources(1, bad), [wordSources(1)[0]]);
+  for (const bad of [0, -1, '../1', 1.5, Infinity]) assert.throws(() => wordSources(bad, catalog));
+});
+
+test('詞目、課程例字均取得鏡像與備援；索引下載失敗可再試', async () => {
+  const original = { document: globalThis.document, fetch: globalThis.fetch };
+  globalThis.document = { documentElement: { dataset: { runtime: 'static' } } };
+  let failedOnce = false;
+  globalThis.fetch = async (url) => {
+    const name = new URL(url).pathname.split('/').pop();
+    if (name === 'word-audio-catalog.json' && !failedOnce) {
+      failedOnce = true;
+      throw new Error('network');
+    }
+    return {
+      ok: true,
+      json: async () =>
+        JSON.parse(await readFile(new URL(`../site/data/${name}`, import.meta.url))),
+    };
+  };
+  try {
+    const api = await import('../site/api.mjs?audio-regression');
+    assert.equal((await api.audioURLs({ id: 1 })).length, 1);
+    assert.equal((await api.audioURLs({ id: 1 })).length, 2);
+    const sounds = JSON.parse(
+      await readFile(new URL('../site/data/sound-examples.json', import.meta.url)),
+    );
+    for (const key of Object.keys(sounds))
+      assert.equal((await api.audioURLs(null, 0, key)).length, 2);
+  } finally {
+    globalThis.document = original.document;
+    globalThis.fetch = original.fetch;
+  }
+});
+
 test('媒體 error 與 play 拒絕同時發生時，只切換一次來源', async () => {
   const first = deferred(),
     started = deferred();
@@ -128,6 +182,35 @@ test('載入逾時會切換來源並可停止，不留下待播錄音', async ()
   assert.deepEqual(audio.sources, ['stalled', 'ready']);
   player.stop();
   assert.equal(await done, false);
+});
+
+test('播放已開始但緩衝卡住仍切換備援，恢復播放或停止時取消計時', async () => {
+  const audio = new FakeAudio();
+  const player = createAudioPlayer(audio, 15);
+  const started = deferred(),
+    backup = deferred();
+  let plays = 0;
+  const done = player.play(['mirror', 'official'], () =>
+    (++plays === 1 ? started : backup).resolve(),
+  );
+  await started.promise;
+  audio.dispatchEvent(new Event('waiting'));
+  await backup.promise;
+  assert.deepEqual(audio.sources, ['mirror', 'official']);
+  audio.end();
+  assert.equal(await done, true);
+  const nextStarted = deferred();
+  const next = player.play(['mirror', 'official'], nextStarted.resolve);
+  await nextStarted.promise;
+  audio.dispatchEvent(new Event('waiting'));
+  audio.dispatchEvent(new Event('playing'));
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(audio.sources.length, 3);
+  audio.dispatchEvent(new Event('waiting'));
+  player.stop();
+  assert.equal(await next, false);
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  assert.equal(audio.sources.length, 3);
 });
 
 test('五種詞目題型自動讀詞，辨音模式依順序讀選項且不標示正解', () => {

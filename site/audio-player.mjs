@@ -1,7 +1,7 @@
 import { keyOf } from './core.mjs';
 
 // Made By 冷踢踢。只讓目前這次播放接收事件，避免換詞後舊錄音繼續出聲。
-export function createAudioPlayer(audio, timeout = 20000) {
+export function createAudioPlayer(audio, timeout = 8000) {
   let active = null;
   const stop = () => {
     const previous = active;
@@ -24,6 +24,8 @@ export function createAudioPlayer(audio, timeout = 20000) {
             clearTimeout(timer);
             audio.removeEventListener('ended', ended);
             audio.removeEventListener('error', failed);
+            audio.removeEventListener('waiting', waiting);
+            audio.removeEventListener('playing', playing);
           },
         };
         const finish = (result) => {
@@ -51,6 +53,7 @@ export function createAudioPlayer(audio, timeout = 20000) {
             await audio.play();
             if (active !== task || current !== attempt) return;
             clearTimeout(timer);
+            timer = null;
             onPlaying();
           } catch (error) {
             if (active !== task || current !== attempt) return;
@@ -62,9 +65,22 @@ export function createAudioPlayer(audio, timeout = 20000) {
         const failed = () => {
           if (audio.error) next();
         };
+        const playing = () => {
+          clearTimeout(timer);
+          timer = null;
+        };
+        const waiting = () => {
+          if (active !== task || timer) return;
+          const current = attempt;
+          timer = setTimeout(() => {
+            if (active === task && current === attempt) next();
+          }, timeout);
+        };
         active = task;
         audio.addEventListener('ended', ended);
         audio.addEventListener('error', failed);
+        audio.addEventListener('waiting', waiting);
+        audio.addEventListener('playing', playing);
         next();
       });
     },

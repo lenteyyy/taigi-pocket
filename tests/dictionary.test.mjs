@@ -92,6 +92,17 @@ test('全數例句錄音均對應原始音檔名稱，所有播放鍵都有資�
   });
   assert.equal((await full.request('/api/meta')).exampleAudioKeys.length, all.length);
 });
+test('22,298 筆詞目原音均以詞庫檔名核對鏡像，不混用同字的其他讀音', async () => {
+  const catalog = await readJSON('word-audio-catalog.json');
+  const entries = rows(
+    await loadDatabase('moe'),
+    "SELECT id,audio_basename FROM entry WHERE audio_basename<>''",
+  );
+  assert.equal(entries.length, 22298);
+  assert.equal(Object.keys(catalog.files).length, entries.length);
+  assert.equal(catalog.sourceDatabaseSHA256, provenance['taigi-dict.sqlite'].publishedSHA256);
+  for (const entry of entries) assert.equal(catalog.files[entry.id], entry.audio_basename + '.mp3');
+});
 test('公開資料快照完整且兩部詞庫分開標示授權', async () => {
   const meta = await dictionary.request('/api/meta');
   assert.equal(meta.dictionaryCount, 29591);
