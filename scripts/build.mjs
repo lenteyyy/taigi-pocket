@@ -28,6 +28,7 @@ for (const file of [
   ...modules,
   'style.css',
   'data/audio-catalog.json',
+  'data/word-audio-catalog.json',
   'data/example-audio.json',
   'data/search.json',
 ])

@@ -1,4 +1,4 @@
-import { exampleSources } from './audio-sources.mjs';
+import { exampleSources, wordSources } from './audio-sources.mjs';
 const serverMode = document.documentElement.dataset.runtime === 'server';
 const base = new URL('.', import.meta.url);
 const pending = new Map();
@@ -66,6 +66,7 @@ export async function request(path, options) {
   return result;
 }
 let sounds = null,
+  words = null,
   examples = null;
 const json = async (path) => {
   const response = await fetch(assetURL(path));
@@ -75,6 +76,13 @@ const json = async (path) => {
 export async function audioURL(entry, example = 0, sound = '') {
   return (await audioURLs(entry, example, sound))[0];
 }
+async function wordAudioSources(id) {
+  words ||= json('data/word-audio-catalog.json').catch(() => {
+    words = null;
+    return null;
+  });
+  return wordSources(id, await words);
+}
 export async function audioURLs(entry, example = 0, sound = '') {
   if (sound) {
     sounds ||= json('data/sound-examples.json').catch((error) => {
@@ -83,7 +91,7 @@ export async function audioURLs(entry, example = 0, sound = '') {
     });
     const item = (await sounds)[sound];
     if (!item) throw new Error('這個範例目前沒有錄音。');
-    return [wordAudioURL(item.entry)];
+    return wordAudioSources(item.entry);
   }
   const local = serverMode
     ? assetURL(
@@ -101,15 +109,8 @@ export async function audioURLs(entry, example = 0, sound = '') {
     const [official, catalog] = await examples;
     return [...(local ? [local] : []), ...exampleSources(example, official, catalog)];
   }
-  return [local || wordAudioURL(entry.id)];
+  return [...(local ? [local] : []), ...(await wordAudioSources(entry.id))];
 }
 export function wordAudioURL(id) {
-  if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error('詞目編號不正確。');
-  return (
-    'https://sutian.moe.edu.tw/media/senn/mp3/imtong/subak/' +
-    Math.floor(Number(id) / 1000) +
-    '/' +
-    Number(id) +
-    '.mp3'
-  );
+  return wordSources(id)[0];
 }

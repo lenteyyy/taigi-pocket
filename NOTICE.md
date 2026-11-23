@@ -21,3 +21,5 @@ Lenteyyy 個人 Logo：由專案擁有者提供，擁有者確認已取得完整
 台語小辭典／Taigi Pocket 品牌標誌：由專案擁有者提供。原始 PNG 保持不變，網站及分頁圖示以 SVG 顯示範圍呈現。品牌與圖像權利保留，不包含於程式碼的 MIT 授權；衍生專案應替換自己的品牌標誌。
 
 例句原音鏡像：[ChhoeTaigi/KipSutianDataMirror](https://github.com/ChhoeTaigi/KipSutianDataMirror)，固定使用 20261019-0109 版本。17,907 筆檔名同時對照[教育部例句 MP3 下載](https://sutian.moe.edu.tw/zh-hant/siongkuantsuguan/)與鏡像 Git 樹確認；來源與索引雜湊記於 site/data/audio-catalog.json。錄音沿用教育部 CC BY-ND 3.0 TW 授權，未剪輯、轉製或改寫。
+
+詞目原音使用上述鏡像同一版本的 sutiau/ 目錄，22,298 筆原始檔名逐筆對照詞庫 audio_basename 與鏡像 Git 樹。來源、詞庫雜湊與樹版本記錄於 site/data/word-audio-catalog.json，可用 scripts/prepare_word_audio_catalog.py 重建。播放優先採用鏡像，教育部原站為備援；不改寫錄音內容。
